@@ -1,35 +1,40 @@
-import  numpy as np
+"""
+Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
+Task 2: Hyperelasticity I
 
-def get_deviator(field):
-    N = field.shape[2]
-    deviator = np.zeros((3, 3, N))
-    print(deviator.shape)
+==================
 
-    for i in range(0, N):
-        tr = np.trace(field[:, :, i])
-        deviator[:, :, i] = field[:, :, i] - 1/3*tr*np.eye(3)
+Authors: Henrik Hembrock, Jonathan Stollberg
 
+11/2022
+"""
+import tensorflow as tf
+
+def deviator(field):
+    # define second order identity tensor
+    n = len(field)
+    I = tf.eye(3, batch_shape=[n], dtype=field.dtype)
+    
+    # c0mpute deviator
+    trace = tf.linalg.trace(field)
+    trace = tf.reshape(trace, (len(field),1,1))
+    deviator = field - 1/3*trace*I
+    
     return deviator
 
+def equivalent(field, field_type):
+    # get deviator
+    dev = deviator(field)
 
-def get_equivalent(field, type):
-    N = field.shape[2]
-    dev = get_deviator(field)
-    eq = np.zeros(N)
-
-    if type == "strain":
+    # compute equivalent quantity
+    if field_type == "strain":
         k = 2/3
-    elif type == "stress":
+    elif field_type == "stress":
         k = 3/2
     else:
-        print("no valid field type.")
-
-    for i in range(0, N):
-        eq[i] = np.sqrt(k*np.tensordot(dev[:, :, i], dev[:, :, i]))
+        print("No valid field type.")
+        
+    eq = tf.math.sqrt(k*tf.einsum("kij,kij->k", dev, dev))
+    eq = tf.reshape(eq, (len(field),1))
 
     return eq
-
-
-
-
-
