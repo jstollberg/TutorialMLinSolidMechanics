@@ -15,6 +15,8 @@ from tensorflow.keras import layers
 from tensorflow.linalg import matmul, matrix_transpose, trace, inv, det
 import matplotlib.pyplot as plt
 
+from utils import equivalent
+
 # loc_base = os.path.join(".", "task2", "data")
 loc_base = os.path.join(".", "..", "data")
 loc_biaxial = (os.path.join(loc_base, "calibration", "biaxial.txt"),
@@ -146,7 +148,19 @@ def plot_load_path(F, P):
     ax2.legend()
     ax2.grid()
 
-    plt.show
+    plt.show()
+    
+def plot_equivalent(F, P):
+    # compute equivalent quantities
+    F_eq = equivalent(F, "strain")
+    P_eq = equivalent(P, "stress")
+
+    fig, ax = plt.subplots(dpi=600)
+    ax.plot(F_eq, P_eq)
+    ax.set(xlabel="equivalent deformation gradient",
+           ylabel="equivalent first Piola-Kirchhoff stress")
+    ax.grid()
+    plt.show()
 
 if __name__ == "__main__":
     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -168,6 +182,7 @@ if __name__ == "__main__":
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
     assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3)
     assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3)
-
+    
     # plot load path
-    plot_load_path(F_data, P_data)
+    plot_load_path(F_data, P)
+    plot_equivalent(F_data, P)
