@@ -11,11 +11,10 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 import os
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
-from tensorflow.linalg import matmul, matrix_transpose, trace, inv, det
 import matplotlib.pyplot as plt
 
 from utils import equivalent
+from models import Invariants, StrainEnergy, PiolaKirchhoff
 
 # loc_base = os.path.join(".", "task2", "data")
 loc_base = os.path.join(".", "..", "data")
@@ -47,10 +46,11 @@ def load_data(file):
         W[i,:] = d[18]
         
     F = tf.convert_to_tensor(F)
+    C = tf.linalg.matrix_transpose(F)*F
     P = tf.convert_to_tensor(P)
     W = tf.convert_to_tensor(W)
 
-    return F, P, W
+    return F, C, P, W
 
 def load_invariants(file):
     data = np.loadtxt(file)
@@ -69,52 +69,6 @@ def load_invariants(file):
     ret = tf.stack([I1, J, -J, I4, I5], axis=1)
 
     return ret
-
-class Invariants(layers.Layer):
-    def __call__(self, F):
-        # define transersely isotropic structural tensro
-        G = tf.constant([[[4.0, 0.0, 0.0],
-                          [0.0, 0.5, 0.0],
-                          [0.0, 0.0, 0.5]]]*len(F), dtype=F.dtype)
-        
-        # compute right Cauchy-Green tensor
-        C = matmul(matrix_transpose(F), F)
-
-        # compute invariants
-        I1   = trace(C)
-        J    = det(F)
-        I4   = trace(C*G)
-        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
-        I5   = trace(cofC*G)
-        
-        # collect all invariants in one tensor
-        ret = tf.stack([I1, J, -J, I4, I5], axis=1)
-    
-        return ret
-
-class StrainEnergy(layers.Layer):
-    def __call__(self, invariants):
-        # extract invariants
-        I1 = invariants[:,0]
-        J  = invariants[:,1]
-        I4 = invariants[:,3]
-        I5 = invariants[:,4]
-        
-        # compute strain energy
-        W = 8*I1 + 10*J**2 - 56*tf.math.log(J) + 0.2*(I4**2 + I5**2) - 44
-        W = tf.reshape(W, (len(invariants),1))
-        
-        return W
-    
-class PiolaKirchhoff(layers.Layer):
-    def __call__(self, F):
-        with tf.GradientTape() as tape:
-            tape.watch(F)
-            I = Invariants()(F)
-            W = StrainEnergy()(I)
-        P = tape.gradient(W, F)
-        
-        return P
 
 def plot_load_path(F, P):
     # plot stress and strain in normal direction
@@ -170,13 +124,13 @@ if __name__ == "__main__":
     data_file, invariants_file = loc_biaxial
     
     # load data
-    F_data, P_data, W_data = load_data(data_file)
+    F_data, C_data, P_data, W_data = load_data(data_file)
     I_data = load_invariants(invariants_file)
     
     # evaluate invariants, energy and stress
-    I = Invariants()(F_data)
+    I = Invariants()(F=F_data)
     W = StrainEnergy()(I)
-    P = PiolaKirchhoff()(F_data)
+    P = PiolaKirchhoff()(F_data, lambda F: StrainEnergy()(Invariants()(F)))
     
     # check if the implementation is valid
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
