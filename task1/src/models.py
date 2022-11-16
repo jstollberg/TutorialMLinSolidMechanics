@@ -73,3 +73,4 @@ class GradNeuralNetwork(tf.keras.Model):
         g = tape.gradient(y, x)
         
         return y, g
+        
