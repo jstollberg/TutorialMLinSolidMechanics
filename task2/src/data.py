@@ -104,8 +104,8 @@ class StrainEnergy(layers.Layer):
         
         return W
     
-class PiolaKirchhoff(tf.keras.Model):
-    def call(self, F):
+class PiolaKirchhoff(layers.Layer):
+    def __call__(self, F):
         with tf.GradientTape() as tape:
             tape.watch(F)
             I = Invariants()(F)
