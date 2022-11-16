@@ -93,7 +93,7 @@ class PiolaKirchhoffICNN(tf.keras.Model):
             self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
             
         def call(self, F):
-            P, W = PiolaKirchhoff()(F, self.ls(Invariants()(F)))
+            P, W = PiolaKirchhoff()(F, lambda F: self.ls(Invariants()(F)))
             return P, W
     
 if __name__ == "__main__":
