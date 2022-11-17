@@ -8,6 +8,7 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 
 11/2022
 """
+import numpy as np
 import tensorflow as tf
 
 def deviator(field):
@@ -38,3 +39,14 @@ def equivalent(field, field_type):
     eq = tf.reshape(eq, (len(field),1))
 
     return eq
+
+def weight_L2(*tensors):
+    weights = np.array([])
+    for T in tensors:
+        norm = tf.norm(T, ord="fro", axis=[-2,-1])
+        w = tf.reduce_sum(norm)
+        w = np.repeat(1/w.numpy(), len(T))
+        weights = np.concatenate((weights, w))
+        
+    return weights
+    

@@ -13,7 +13,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from utils import equivalent
+from utils import equivalent, weight_L2
 from models import Invariants, StrainEnergy, PiolaKirchhoff
 
 # loc_base = os.path.join(".", "task2", "data")
@@ -130,7 +130,9 @@ if __name__ == "__main__":
     # evaluate invariants, energy and stress
     I = Invariants()(F=F_data)
     W = StrainEnergy()(I)
-    P = PiolaKirchhoff()(F_data, lambda F: StrainEnergy()(Invariants()(F)))
+    P = PiolaKirchhoff()(F_data)
+    
+    w = weight_L2(P)
     
     # check if the implementation is valid
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
@@ -138,5 +140,5 @@ if __name__ == "__main__":
     assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3)
     
     # plot load path
-    plot_load_path(F_data, P)
-    plot_equivalent(F_data, P)
+    # plot_load_path(F_data, P)
+    # plot_equivalent(F_data, P)
