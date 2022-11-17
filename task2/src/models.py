@@ -23,10 +23,12 @@ from tensorflow.keras.constraints import non_neg
 class Invariants(layers.Layer):
     def __call__(self, F):
         # define transersely isotropic structural tensro
-        n = len(F)
-        G = tf.constant([[[4.0, 0.0, 0.0],
-                          [0.0, 0.5, 0.0],
-                          [0.0, 0.0, 0.5]]]*n, dtype=F.dtype)
+        G = np.array([[4.0, 0.0, 0.0],
+                      [0.0, 0.5, 0.0],
+                      [0.0, 0.0, 0.5]])
+        G = tf.convert_to_tensor(G, dtype=F.dtype)
+        G = tf.tile(G, [len(F),1])
+        G = tf.reshape(G, (len(F),3,3))
         
         # compute right Cauchy-Green tensor
         C = tf.linalg.matrix_transpose(F)*F
@@ -87,10 +89,11 @@ class PiolaKirchhoffICNN(tf.keras.Model):
                      nlayers=3,
                      units=8):
             super(PiolaKirchhoffICNN, self).__init__()
-            self.ls = [layers.Dense(units, activation="softplus")]
+            self.ls = [layers.Dense(units, activation="softplus",
+                                    kernel_constraint=non_neg())]
             for l in range(nlayers - 1):
                 self.ls += [layers.Dense(units, activation="softplus",
-                            kernel_constraint=non_neg())]
+                                         kernel_constraint=non_neg())]
             self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
             
         def call(self, F):
@@ -120,18 +123,22 @@ if __name__ == "__main__":
     weight = weight_L2(P_biaxial, P_uniaxial, P_shear)
     
     # setup of the neural network
-    training_in = tf.concat([C_biaxial, C_uniaxial, C_shear], axis=0)
-    training_out = tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0)
-    sample_weight=weight
-    # sample_weight = None
+    training_in = tf.concat([F_biaxial, F_uniaxial, F_shear], axis=0)
+    training_out = [tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0),
+                    tf.concat([W_biaxial, W_uniaxial, W_shear], axis=0)]
+    # training_in = tf.concat([C_biaxial, C_uniaxial, C_shear], axis=0)
+    # training_out = tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0)
+    sample_weight = weight
+    loss_weights = [1,0]
     kwargs = {"nlayers": 3, "units": 16}
     
     # compile FFNN
-    model = PiolaKirchhoffFFNN(**kwargs)
-    model.compile("adam", "mse")
+    # model = PiolaKirchhoffFFNN(**kwargs)
+    model = PiolaKirchhoffICNN(**kwargs)
+    model.compile("adam", "mse", loss_weights=loss_weights)
     
     # fit to data
-    epochs = 1000
+    epochs = 2500
     tf.keras.backend.set_value(model.optimizer.learning_rate, 0.002)
     h = model.fit(training_in, 
                   training_out, 
@@ -140,7 +147,7 @@ if __name__ == "__main__":
                   verbose=2)
     
     # interpolate data
-    C_model = C_shear
-    P_model = model.predict(C_model)
-    plot_load_path(C_model, P_model)
-    plot_load_path(C_biaxial, P_biaxial)
+    F_model = F_biaxial
+    P_model, W_model = model.predict(F_model)
+    plot_load_path(F_model, P_model)
+    # plot_load_path(C_biaxial, P_biaxial)
