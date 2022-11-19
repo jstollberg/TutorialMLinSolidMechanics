@@ -74,7 +74,8 @@ class PiolaKirchhoffFFNN(tf.keras.Model):
                  nlayers=3,
                  units=8):
         super(PiolaKirchhoffFFNN, self).__init__()
-        self.ls = [layers.Dense(units, activation="softplus")]
+        self.ls = [layers.Dense(units, activation="softplus", 
+                                input_shape=(3,3))]
         for l in range(nlayers - 1):
             self.ls += [layers.Dense(units, activation="softplus")]
         self.ls += [layers.Dense(3)]
@@ -90,7 +91,8 @@ class PiolaKirchhoffICNN(tf.keras.Model):
                      units=8):
             super(PiolaKirchhoffICNN, self).__init__()
             self.ls = [layers.Dense(units, activation="softplus",
-                                    kernel_constraint=non_neg())]
+                                    kernel_constraint=non_neg(), 
+                                    input_shape=(5,))]
             for l in range(nlayers - 1):
                 self.ls += [layers.Dense(units, activation="softplus",
                                          kernel_constraint=non_neg())]
@@ -129,7 +131,7 @@ if __name__ == "__main__":
     # training_in = tf.concat([C_biaxial, C_uniaxial, C_shear], axis=0)
     # training_out = tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0)
     sample_weight = weight
-    loss_weights = [1,0]
+    loss_weights = None
     kwargs = {"nlayers": 3, "units": 16}
     
     # compile FFNN
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     model.compile("adam", "mse", loss_weights=loss_weights)
     
     # fit to data
-    epochs = 2500
+    epochs = 1000
     tf.keras.backend.set_value(model.optimizer.learning_rate, 0.002)
     h = model.fit(training_in, 
                   training_out, 
@@ -149,5 +151,6 @@ if __name__ == "__main__":
     # interpolate data
     F_model = F_biaxial
     P_model, W_model = model.predict(F_model)
+    # P_model = model.predict(F_model)
     plot_load_path(F_model, P_model)
     # plot_load_path(C_biaxial, P_biaxial)
