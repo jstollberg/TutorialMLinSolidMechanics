@@ -1,10 +1,4 @@
 """
-Created on Wed Nov 16 19:42:02 2022
-
-@author: jonat
-"""
-
-"""
 Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
 Task 2: Hyperelasticity I
 
