@@ -21,7 +21,7 @@ from tensorflow.linalg import trace, inv, det
 from tensorflow.keras.constraints import non_neg
 
 class Invariants(layers.Layer):
-    def __call__(self, F):
+    def call(self, F):
         # define transersely isotropic structural tensro
         G = np.array([[4.0, 0.0, 0.0],
                       [0.0, 0.5, 0.0],
@@ -46,7 +46,7 @@ class Invariants(layers.Layer):
         return ret
 
 class StrainEnergy(layers.Layer):
-    def __call__(self, invariants):
+    def call(self, invariants):
         # extract invariants
         I1 = invariants[:,0]
         J  = invariants[:,1]
@@ -60,14 +60,14 @@ class StrainEnergy(layers.Layer):
         return W
     
 class PiolaKirchhoff(layers.Layer):
-    def __call__(self, F):
+    def call(self, F, strain_energy):
         with tf.GradientTape() as tape:
             tape.watch(F)
             I = Invariants()(F)
-            W = StrainEnergy()(I)
+            W = strain_energy(I)
         P = tape.gradient(W, F)
         
-        return P
+        return P, W
     
 class PiolaKirchhoffFFNN(tf.keras.Model):
     def __init__(self,
@@ -99,13 +99,13 @@ class PiolaKirchhoffICNN(tf.keras.Model):
             self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
             
         def call(self, F):
-            with tf.GradientTape() as tape:
-                tape.watch(F)
-                I = Invariants()(F)
-                for l in self.ls:
-                    I = l(I)
-            P = tape.gradient(I, F)
-            return P, I
+            P , W = PiolaKirchhoff()(F, self._strain_energy)
+            return P, W
+        
+        def _strain_energy(self, I):
+            for l in self.ls:
+                I = l(I)
+            return I
     
 if __name__ == "__main__":
     import os

@@ -128,9 +128,8 @@ if __name__ == "__main__":
     I_data = load_invariants(invariants_file)
     
     # evaluate invariants, energy and stress
-    I = Invariants()(F=F_data)
-    W = StrainEnergy()(I)
-    P = PiolaKirchhoff()(F_data)
+    I = Invariants()(F_data)
+    P, W = PiolaKirchhoff()(F_data, StrainEnergy())
     
     w = weight_L2(P)
     
