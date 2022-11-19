@@ -33,7 +33,7 @@ def equivalent(field, field_type):
     elif field_type == "stress":
         k = 3/2
     else:
-        print("No valid field type.")
+        raise ValueError("No valid field type.")
         
     eq = tf.math.sqrt(k*tf.einsum("kij,kij->k", dev, dev))
     eq = tf.reshape(eq, (len(field),1))
