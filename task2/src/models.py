@@ -13,9 +13,14 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.linalg import trace, inv, det
 from tensorflow.keras.constraints import non_neg
+from utils import tensor_to_voigt, voigt_to_tensor
 
 class Invariants(layers.Layer):
     def call(self, F):
+        # convert to tensor notation if neccessary
+        if len(F.shape) == 2:
+            F = tf.reshape(F, (-1,3,3))
+
         # define transersely isotropic structural tensro
         G = np.array([[4.0, 0.0, 0.0],
                       [0.0, 0.5, 0.0],
@@ -69,10 +74,10 @@ class PiolaKirchhoffFFNN(tf.keras.Model):
                  units=8):
         super(PiolaKirchhoffFFNN, self).__init__()
         self.ls = [layers.Dense(units, activation="softplus", 
-                                input_shape=(3,3))]
+                                input_shape=(9,))]
         for l in range(nlayers - 1):
             self.ls += [layers.Dense(units, activation="softplus")]
-        self.ls += [layers.Dense(3)]
+        self.ls += [layers.Dense(9)]
       
     def call(self, C):
         for l in self.ls:
@@ -146,5 +151,5 @@ if __name__ == "__main__":
     F_model = F_biaxial
     P_model, W_model = model.predict(F_model)
     # P_model = model.predict(F_model)
-    plot_load_path(F_model, P_model)
-    # plot_load_path(C_biaxial, P_biaxial)
+    plot_load_path(voigt_to_tensor(F_model), voigt_to_tensor(P_model))
+    plot_load_path(voigt_to_tensor(C_biaxial), voigt_to_tensor(P_biaxial))
