@@ -15,15 +15,34 @@ import matplotlib.pyplot as plt
 
 from utils import equivalent, weight_L2
 from models import Invariants, StrainEnergy, PiolaKirchhoff
+from random import randrange
 
-# loc_base = os.path.join(".", "task2", "data")
-loc_base = os.path.join(".", "..", "data")
+loc_base = os.path.join(".", "task2", "data")
+#loc_base = os.path.join(".", "..", "data")
 loc_biaxial = (os.path.join(loc_base, "calibration", "biaxial.txt"),
                os.path.join(loc_base, "invariants", "I_biaxial.txt"))
 loc_pure_shear = (os.path.join(loc_base, "calibration", "pure_shear.txt"),
                   os.path.join(loc_base, "invariants", "I_pure_shear.txt"))
 loc_uniaxial = (os.path.join(loc_base, "calibration", "uniaxial.txt"),
                 os.path.join(loc_base, "invariants", "I_uniaxial.txt"))
+loc_path_data = (os.path.join(loc_base, "concentric"))
+
+
+# Randomly pick N load paths from concentric folder
+# F11 F12 F13 F21 F22 F23 F31 F32 F33
+def load_rand_path_data(N, loc, count=100, lines=50):
+    F = np.empty((N*lines, 9))
+
+    for i in range(N):
+        start, stop = i*50, i*50+50
+        ind = randrange(1, 100)
+        loc_n = (os.path.join(loc, str(ind)+".txt"))
+        data = np.loadtxt(loc_n)
+        print("read file " + str(ind) + ".txt")
+        F[start:stop, :] = data
+    
+    return F
+
 
 def load_data(file):
     data = np.loadtxt(file)
@@ -126,6 +145,7 @@ if __name__ == "__main__":
     # load data
     F_data, C_data, P_data, W_data = load_data(data_file)
     I_data = load_invariants(invariants_file)
+    path_data = load_rand_path_data(3, loc_path_data)
     
     # evaluate invariants, energy and stress
     I = Invariants()(F_data)
