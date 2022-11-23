@@ -17,8 +17,9 @@ from utils import tensor_to_voigt, voigt_to_tensor, equivalent, weight_L2
 from models import Invariants, StrainEnergy, PiolaKirchhoff
 from random import randrange
 
-loc_base = os.path.join(".", "task2", "data")
-#loc_base = os.path.join(".", "..", "data")
+# loc_base = os.path.join(".", "task2", "data")
+loc_base = os.path.join(".", "..", "data")
+
 loc_biaxial = (os.path.join(loc_base, "calibration", "biaxial.txt"),
                os.path.join(loc_base, "invariants", "I_biaxial.txt"))
 loc_pure_shear = (os.path.join(loc_base, "calibration", "pure_shear.txt"),
@@ -27,6 +28,8 @@ loc_uniaxial = (os.path.join(loc_base, "calibration", "uniaxial.txt"),
                 os.path.join(loc_base, "invariants", "I_uniaxial.txt"))
 loc_path_data = (os.path.join(loc_base, "concentric"))
 
+loc_biaxial_test = os.path.join(loc_base, "test", "biax_test.txt")
+loc_mixed_test = os.path.join(loc_base, "test", "mixed_test.txt")
 
 # Randomly pick N load paths from concentric folder
 # F11 F12 F13 F21 F22 F23 F31 F32 F33
@@ -42,7 +45,6 @@ def load_rand_path_data(N, loc, count=100, lines=50):
         F[start:stop, :] = data
     
     return F
-
 
 def load_data(file, voigt=True):
     data = np.loadtxt(file)
@@ -144,8 +146,6 @@ if __name__ == "__main__":
     # evaluate invariants, energy and stress
     I = Invariants()(F_data)
     P, W = PiolaKirchhoff()(F_data, StrainEnergy())
-
-    # w = weight_L2(P)
     
     # check if the implementation is valid
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
