@@ -43,6 +43,9 @@ def equivalent(field, field_type):
 def weight_L2(*tensors):
     weights = np.array([])
     for T in tensors:
+        if len(T.shape) == 2:
+            T = tf.reshape(T, (-1,3,3))
+        
         norm = tf.norm(T, ord="fro", axis=[-2,-1])
         w = tf.reduce_sum(norm)
         w = np.repeat(1/w.numpy(), len(T))
@@ -50,3 +53,8 @@ def weight_L2(*tensors):
         
     return weights
     
+def tensor_to_voigt(tensor):
+    return tf.reshape(tensor, (-1,9))
+
+def voigt_to_tensor(tensor):
+    return tf.reshape(tensor, (-1,3,3))
