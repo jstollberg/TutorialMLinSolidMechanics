@@ -13,7 +13,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-from utils import equivalent, weight_L2
+from utils import tensor_to_voigt, voigt_to_tensor, equivalent, weight_L2
 from models import Invariants, StrainEnergy, PiolaKirchhoff
 
 # loc_base = os.path.join(".", "task2", "data")
@@ -25,30 +25,24 @@ loc_pure_shear = (os.path.join(loc_base, "calibration", "pure_shear.txt"),
 loc_uniaxial = (os.path.join(loc_base, "calibration", "uniaxial.txt"),
                 os.path.join(loc_base, "invariants", "I_uniaxial.txt"))
 
-def load_data(file):
+def load_data(file, voigt=True):
     data = np.loadtxt(file)
     
-    # define function to convert Voigt notation to tensor
-    voigt_to_tensor = lambda A: tf.constant([[A[0], A[1], A[2]],
-                                             [A[3], A[4], A[5]],
-                                             [A[6], A[7], A[8]]])
-
-    # get data count
-    n = data.shape[0]
+    # convert numpy array to tensorflow tensor
+    F = tf.convert_to_tensor(data[:,[0,1,2,3,4,5,6,7,8]])
+    P = tf.convert_to_tensor(data[:,[9,10,11,12,13,14,15,16,17]])
+    W = tf.reshape(tf.convert_to_tensor(data[:,18]), (-1,1))
     
     # convert to tensor notation
-    F = np.empty((n,3,3))
-    P = np.empty((n,3,3))
-    W = np.empty((n,1))
-    for i, d in enumerate(data):
-        F[i,:,:] = voigt_to_tensor(d[0:9])
-        P[i,:,:] = voigt_to_tensor(d[9:18])
-        W[i,:] = d[18]
-        
-    F = tf.convert_to_tensor(F)
+    F = voigt_to_tensor(F)
+    P = voigt_to_tensor(P)
     C = tf.linalg.matrix_transpose(F)*F
-    P = tf.convert_to_tensor(P)
-    W = tf.convert_to_tensor(W)
+    
+    # convert to voigt notation if requested
+    if voigt:
+        F = tensor_to_voigt(F)
+        C = tensor_to_voigt(C)
+        P = tensor_to_voigt(P)
 
     return F, C, P, W
 
@@ -124,14 +118,14 @@ if __name__ == "__main__":
     data_file, invariants_file = loc_biaxial
     
     # load data
-    F_data, C_data, P_data, W_data = load_data(data_file)
+    F_data, C_data, P_data, W_data = load_data(data_file, voigt=True)
     I_data = load_invariants(invariants_file)
     
     # evaluate invariants, energy and stress
     I = Invariants()(F_data)
     P, W = PiolaKirchhoff()(F_data, StrainEnergy())
-    
-    w = weight_L2(P)
+
+    # w = weight_L2(P)
     
     # check if the implementation is valid
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
