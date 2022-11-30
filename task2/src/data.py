@@ -29,8 +29,17 @@ loc_uniaxial = (os.path.join(loc_base, "calibration", "uniaxial.txt"),
                 os.path.join(loc_base, "invariants", "I_uniaxial.txt"))
 loc_path_data = (os.path.join(loc_base, "concentric"))
 
+loc_path_bcc = (os.path.join(loc_base, "soft_beam_lattice_metamaterials",
+                             "data"))
+loc_bcc_uniaxial = os.path.join(loc_path_bcc, "BCC_uniaxial.txt")
+loc_bcc_biaxial = os.path.join(loc_path_bcc, "BCC_biaxial.txt")
+loc_bcc_planar = os.path.join(loc_path_bcc, "BCC_planar.txt")
+loc_bcc_shear = os.path.join(loc_path_bcc, "BCC_shear.txt")
+loc_bcc_volumetric = os.path.join(loc_path_bcc, "BCC_volumetric.txt")
+
 loc_biaxial_test = os.path.join(loc_base, "test", "biax_test.txt")
 loc_mixed_test = os.path.join(loc_base, "test", "mixed_test.txt")
+
 
 # Randomly pick N load paths from concentric folder
 # F11 F12 F13 F21 F22 F23 F31 F32 F33
@@ -47,7 +56,7 @@ def load_rand_path_data(N, loc, count=100, lines=50):
     
     return F
 
-def load_data(file, voigt=True):
+def load_data(file, a=1.0, voigt=True):
     data = np.loadtxt(file)
     
     # convert numpy array to tensorflow tensor
@@ -66,7 +75,7 @@ def load_data(file, voigt=True):
         C = tensor_to_voigt(C)
         P = tensor_to_voigt(P)
 
-    return F, C, P, W
+    return F, C, P*a, W*a
 
 def load_invariants(file):
     data = np.loadtxt(file)
@@ -138,20 +147,22 @@ if __name__ == "__main__":
 
     # setup
     data_file, invariants_file = loc_biaxial
+    data_file = loc_bcc_uniaxial
+    data = load_data(data_file)
     
     # load data
-    F_data, C_data, P_data, W_data = load_data(data_file, voigt=True)
-    I_data = load_invariants(invariants_file)
-    path_data = load_rand_path_data(3, loc_path_data)
+    # F_data, C_data, P_data, W_data = load_data(data_file, voigt=True)
+    # I_data = load_invariants(invariants_file)
+    # path_data = load_rand_path_data(3, loc_path_data)
     
-    # evaluate invariants, energy and stress
-    I = InvariantsTransIso()(F_data)
-    P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
+    # # evaluate invariants, energy and stress
+    # I = InvariantsTransIso()(F_data)
+    # P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
     
-    # check if the implementation is valid
-    assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
-    assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3)
-    assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3)
+    # # check if the implementation is valid
+    # assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
+    # assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3)
+    # assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3)
     
     # plot load path
     # plot_load_path(F_data, P)
