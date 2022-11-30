@@ -15,7 +15,7 @@ from tensorflow.linalg import trace, inv, det
 from tensorflow.keras.constraints import non_neg
 from utils import tensor_to_voigt, voigt_to_tensor
 
-class Invariants(layers.Layer):
+class InvariantsTransIso(layers.Layer):
     def call(self, F):
         # convert to tensor notation if neccessary
         if len(F.shape) == 2:
@@ -44,7 +44,7 @@ class Invariants(layers.Layer):
     
         return ret
 
-class StrainEnergy(layers.Layer):
+class StrainEnergyTransIso(layers.Layer):
     def call(self, invariants):
         # extract invariants
         I1 = invariants[:,0]
@@ -58,21 +58,21 @@ class StrainEnergy(layers.Layer):
         
         return W
     
-class PiolaKirchhoff(layers.Layer):
+class PiolaKirchhoffTransIso(layers.Layer):
     def call(self, F, strain_energy):
         with tf.GradientTape() as tape:
             tape.watch(F)
-            I = Invariants()(F)
+            I = InvariantsTransIso()(F)
             W = strain_energy(I)
         P = tape.gradient(W, F)
         
         return P, W
     
-class PiolaKirchhoffFFNN(tf.keras.Model):
+class MS(tf.keras.Model):
     def __init__(self,
                  nlayers=3,
                  units=8):
-        super(PiolaKirchhoffFFNN, self).__init__()
+        super(MS, self).__init__()
         self.ls = [layers.Dense(units, activation="softplus", 
                                 input_shape=(9,))]
         for l in range(nlayers - 1):
@@ -84,11 +84,11 @@ class PiolaKirchhoffFFNN(tf.keras.Model):
             C = l(C)
         return C
     
-class PiolaKirchhoffICNN(tf.keras.Model):
+class WI(tf.keras.Model):
         def __init__(self,
                      nlayers=3,
                      units=8):
-            super(PiolaKirchhoffICNN, self).__init__()
+            super(WI, self).__init__()
             self.ls = [layers.Dense(units, activation="softplus",
                                     kernel_constraint=non_neg(), 
                                     input_shape=(5,))]
@@ -98,7 +98,7 @@ class PiolaKirchhoffICNN(tf.keras.Model):
             self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
             
         def call(self, F):
-            P , W = PiolaKirchhoff()(F, self._strain_energy)
+            P , W = PiolaKirchhoffTransIso()(F, self._strain_energy)
             return P, W
         
         def _strain_energy(self, I):

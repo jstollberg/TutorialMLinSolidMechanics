@@ -14,7 +14,8 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from utils import tensor_to_voigt, voigt_to_tensor, equivalent, weight_L2
-from models import Invariants, StrainEnergy, PiolaKirchhoff
+from models import (InvariantsTransIso, StrainEnergyTransIso, 
+                    PiolaKirchhoffTransIso)
 from random import randrange
 
 # loc_base = os.path.join(".", "task2", "data")
@@ -144,8 +145,8 @@ if __name__ == "__main__":
     path_data = load_rand_path_data(3, loc_path_data)
     
     # evaluate invariants, energy and stress
-    I = Invariants()(F_data)
-    P, W = PiolaKirchhoff()(F_data, StrainEnergy())
+    I = InvariantsTransIso()(F_data)
+    P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
     
     # check if the implementation is valid
     assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
