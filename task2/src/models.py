@@ -31,18 +31,40 @@ class InvariantsTransIso(layers.Layer):
         
         # compute right Cauchy-Green tensor
         C = tf.linalg.matrix_transpose(F)*F
-
+        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
+        
         # compute invariants
         I1   = trace(C)
         J    = det(F)
         I4   = trace(C*G)
-        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
         I5   = trace(cofC*G)
         
         # collect all invariants in one tensor
         ret = tf.stack([I1, J, -J, I4, I5], axis=1)
     
         return ret
+    
+class InvariantsCubic(layers.Layer):
+    def call(self, F):
+        # convert to tensor notation if neccessary
+        if len(F.shape) == 2:
+            F = voigt_to_tensor(F)
+            
+        # compute right Cauchy-Green tensor
+        C = tf.linalg.matrix_transpose(F)*F
+        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
+        
+        # compute invariants
+        I1  = trace(C)
+        I2  = trace(cofC)
+        J   = det(F)
+        I7  = 
+        I11 = 
+        
+        # collect all invariants in one tensor
+        ret = tf.stack([I1, I2, J, -J, I7, I11], axis=1)
+            
+
 
 class StrainEnergyTransIso(layers.Layer):
     def call(self, invariants):
