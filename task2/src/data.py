@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from utils import tensor_to_voigt, voigt_to_tensor, equivalent, weight_L2
 from models import (InvariantsTransIso, StrainEnergyTransIso, 
                     PiolaKirchhoffTransIso)
+from models import (InvariantsCubic)
 from random import randrange
 
 # loc_base = os.path.join(".", "task2", "data")
@@ -148,7 +149,9 @@ if __name__ == "__main__":
     # setup
     data_file, invariants_file = loc_biaxial
     data_file = loc_bcc_uniaxial
-    data = load_data(data_file)
+    F_data, C_data, P_data, W_data = load_data(data_file)
+    
+    I = InvariantsCubic()(F_data)
     
     # load data
     # F_data, C_data, P_data, W_data = load_data(data_file, voigt=True)
