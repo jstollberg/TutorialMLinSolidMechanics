@@ -11,7 +11,8 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 """
 import numpy as np
 import tensorflow as tf
-from tensorflow.linalg import inv, det
+from tensorflow.linalg import inv, det, matmul
+from tensorflow.math import sin, cos
 
 def deviator(field):
     """
@@ -173,3 +174,104 @@ def cofactor(tensor):
 
     """
     return tf.reshape(det(tensor), (len(tensor),1,1))*inv(tensor)
+
+def rotate(tensor, angle, axis, from_left=True):
+    """
+    Rotate a tensor around a given axis and angle.
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The tensor to rotate.
+    angle : float
+        The rotation angle.
+    axis : tuple
+        The rotation axis.
+    from_left : bool, optional
+        If true the rotation matrix is multiplied from the left, i.e. Q*T.
+        Otherwise, T*Q is computed. The default is True.
+
+    Returns
+    -------
+    res : tensorflow.Tensor
+        The rotated tensor.
+
+    """
+    axis = np.array(axis)/np.linalg.norm(axis)
+    x, y, z = axis
+    assert np.isclose(x**2 + y**2 + z**2, 1)
+    phi = angle
+    
+    # define rotation matrix Q
+    Q = [[cos(phi) + (x**2)*(1 - cos(phi)), x*y*(1 - cos(phi)) - z*sin(phi), x*z*(1 - cos(phi)) + y*sin(phi)],
+         [y*x*(1 - cos(phi)) + z*sin(phi), cos(phi) + (y**2)*(1 - cos(phi)), y*z*(1 - cos(phi)) - x*sin(phi)],
+         [z*x*(1 - cos(phi)) - y*sin(phi), z*y*(1 - cos(phi)) + x*sin(phi), cos(phi) + (z**2)*(1 - cos(phi))]]
+    Q = tf.convert_to_tensor(Q, dtype=tensor.dtype)
+    Q = tf.tile(Q, [len(tensor),1])
+    Q = tf.reshape(Q, (len(tensor),3,3))
+    
+    # check for voigt notation
+    voigt = False
+    if len(tensor.shape) == 2:
+        voigt = True
+        tensor = voigt_to_tensor(tensor)
+        
+    # compute rotation
+    if from_left:
+        res = matmul(Q, tensor)
+    else:
+        res = matmul(tensor, Q)
+        
+    if voigt:
+        res = tensor_to_voigt(res)
+    return res
+
+def cubic_symmetries(tensor):
+    """
+    Evaluate the rotations for all symmetry planes of cubic materials.
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The tensor to rotate.
+
+    Returns
+    -------
+    sym : tensorflow.tensor
+        The tensor rotated around all symmetry axes.
+
+    """
+    sym = tf.concat([tensor, 
+                     
+                     rotate(tensor, np.pi/2, (1,0,0), False), 
+                     rotate(tensor, np.pi, (1,0,0), False),
+                     rotate(tensor, 3*np.pi/2, (1,0,0), False), 
+                     
+                     rotate(tensor, np.pi/2, (0,1,0), False), 
+                     rotate(tensor, np.pi, (0,1,0), False),
+                     rotate(tensor, 3*np.pi/2, (0,1,0), False), 
+                     
+                     rotate(tensor, np.pi/2, (0,0,1), False), 
+                     rotate(tensor, np.pi, (0,0,1), False),
+                     rotate(tensor, 3*np.pi/2, (0,0,1), False),
+                     
+                     rotate(tensor, np.pi, (1,1,0), False),
+                     rotate(tensor, np.pi, (-1,1,0), False),
+                     rotate(tensor, np.pi, (1,0,1), False),
+                     rotate(tensor, np.pi, (-1,0,1), False),
+                     rotate(tensor, np.pi, (0,1,1), False),
+                     rotate(tensor, np.pi, (0,-1,1), False),
+                     
+                     rotate(tensor, 2*np.pi/3, (1,1,1), False),
+                     rotate(tensor, 2*np.pi/3, (-1,1,1), False),
+                     rotate(tensor, 2*np.pi/3, (1,-1,1), False),
+                     rotate(tensor, 2*np.pi/3, (-1,-1,1), False),
+                     
+                     rotate(tensor, 4*np.pi/3, (1,1,1), False),
+                     rotate(tensor, 4*np.pi/3, (-1,1,1), False),
+                     rotate(tensor, 4*np.pi/3, (1,-1,1), False),
+                     rotate(tensor, 4*np.pi/3, (-1,-1,1), False),
+                     ], 
+                    axis=0)
+    
+    return sym
