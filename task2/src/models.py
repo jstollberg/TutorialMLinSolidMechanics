@@ -1,22 +1,39 @@
 """
 Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
 Task 2: Hyperelasticity I
+Task 3: Hyperelasticity II
 
 ==================
 
 Authors: Henrik Hembrock, Jonathan Stollberg
 
-11/2022
+12/2022
 """
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tensorflow.linalg import trace, inv, det
+from tensorflow.linalg import trace, det, matmul, matrix_transpose
 from tensorflow.keras.constraints import non_neg
-from utils import tensor_to_voigt, voigt_to_tensor
+from utils import voigt_to_tensor, tensor_to_voigt, cofactor
 
 class InvariantsTransIso(layers.Layer):
     def call(self, F):
+        """
+        Compute the invariants for a transvers isotropic material.
+        
+        The order of the returned invariants is (I1, J, -J, I4, I5).
+
+        Parameters
+        ----------
+        F : tensorflow.Tensor
+            The deformation gradient in Voigt or tensor notation.
+
+        Returns
+        -------
+        ret : tensorflow.Tensor
+            The invariants.
+
+        """
         # convert to tensor notation if neccessary
         if len(F.shape) == 2:
             F = voigt_to_tensor(F)
@@ -30,14 +47,14 @@ class InvariantsTransIso(layers.Layer):
         G = tf.reshape(G, (len(F),3,3))
         
         # compute right Cauchy-Green tensor
-        C = tf.linalg.matrix_transpose(F)*F
-        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
+        C = matmul(matrix_transpose(F), F)
+        cofC = cofactor(C)
         
         # compute invariants
         I1   = trace(C)
         J    = det(F)
-        I4   = trace(C*G)
-        I5   = trace(cofC*G)
+        I4   = trace(matmul(C, G))
+        I5   = trace(matmul(cofC, G))
         
         # collect all invariants in one tensor
         ret = tf.stack([I1, J, -J, I4, I5], axis=1)
@@ -46,6 +63,22 @@ class InvariantsTransIso(layers.Layer):
     
 class InvariantsCubic(layers.Layer):
     def call(self, F):
+        """
+        Compute the invariants for a cubic material.
+        
+        The order of the returned invariants is (I1, I2, J, -J, I7, I11).
+
+        Parameters
+        ----------
+        F : tensorflow.Tensor
+            The deformation gradient in Voigt or tensor notation.
+
+        Returns
+        -------
+        ret : tensorflow.Tensor
+            The invariants.
+
+        """
         # convert to tensor notation if neccessary
         if len(F.shape) == 2:
             F = voigt_to_tensor(F)
@@ -63,8 +96,8 @@ class InvariantsCubic(layers.Layer):
         G = tf.reshape(G, (len(F),3,3,3,3))
             
         # compute right Cauchy-Green tensor
-        C = tf.linalg.matrix_transpose(F)*F
-        cofC = tf.reshape(det(C), (len(F),1,1))*inv(C)
+        C = matmul(matrix_transpose(F), F)
+        cofC = cofactor(C)
         
         # compute invariants
         I1  = trace(C)
@@ -80,6 +113,26 @@ class InvariantsCubic(layers.Layer):
     
 class StrainEnergyTransIso(layers.Layer):
     def call(self, invariants):
+        """
+        Compute the strain energy for a transverse isotropic material.
+        
+        Reference for the energy formulation:
+            J. Schröder, P. Neff and V. Ebbing. “Anisotropic polyconvex 
+            energies on the basis of crystallographic motivated structural 
+            tensors”. In: Journal of the Mechanics and Physics of Solids 56 
+            (2008), pp. 3486–3506. doi: 10.1016/j.jmps.2008.08.008.
+
+        Parameters
+        ----------
+        invariants : tensorflow.Tensor
+            The invariants in order (I1, J, -J, I4, I5).
+
+        Returns
+        -------
+        W : tensorflow.Tensor
+            The strain energy.
+
+        """
         # extract invariants
         I1 = invariants[:,0]
         J  = invariants[:,1]
@@ -92,108 +145,228 @@ class StrainEnergyTransIso(layers.Layer):
         
         return W
     
-class PiolaKirchhoffTransIso(layers.Layer):
-    def call(self, F, strain_energy):
+class PiolaKirchhoff(layers.Layer):
+    def call(self, F, invariants, strain_energy):
+        """
+        Compute the first Piola-Kirchhoff-stress.
+        
+        The stress is computed by differentiating a strain energy formulated
+        in terms of the invariants w.r.t. the deformation gradient.
+
+        Parameters
+        ----------
+        F : tensorflow.Tensor
+            The deformation gradient.
+        invariants : function
+            A function that computes the invariants and takes F as input.
+        strain_energy : function
+            A function that evaluates the strain energy and takes the
+            invariants as input.
+
+        Returns
+        -------
+        P : tensorflow.Tensor
+            The first Piola-Kirchhoff stress.
+        W : tensorflow.Tensor
+            The strain energy.
+
+        """
         with tf.GradientTape() as tape:
             tape.watch(F)
-            I = InvariantsTransIso()(F)
+            I = invariants(F)
             W = strain_energy(I)
         P = tape.gradient(W, F)
         
         return P, W
     
-class PiolaKirchhoffCubic(layers.Layer):
-    def call(self, F, strain_energy):
-        with tf.GradientTape() as tape:
-            tape.watch(F)
-            I = InvariantsCubic()(F)
-            W = strain_energy(I)
-        P = tape.gradient(W, F)
+class ModelMS(tf.keras.Model):
+    """
+    FFNN that maps the right Cauchy-Green strain directly to the first
+    Piola-Kirchhoff stress.
+
+    Parameters
+    ----------
+    nlayers : int, optional
+        Number of hidden layers. The default is 3.
+    units : int, optional
+        Number of nodes per hidden layer. The default is 8.
         
-        return P, W
-    
-class MS(tf.keras.Model):
+    Attributes
+    ----------
+    ls : list
+        The list of hidden layers.
+        
+    Methods
+    -------
+    call:
+        Evaluate the FFNN.
+        
+    """
     def __init__(self,
                  nlayers=3,
                  units=8):
-        super(MS, self).__init__()
+        super(ModelMS, self).__init__()
         self.ls = [layers.Dense(units, activation="softplus", 
-                                input_shape=(9,))]
+                                input_shape=(6,))]
         for l in range(nlayers - 1):
             self.ls += [layers.Dense(units, activation="softplus")]
         self.ls += [layers.Dense(9)]
       
     def call(self, C):
+        """
+        Evaluate the FFNN.
+
+        Parameters
+        ----------
+        C : tensorflow.Tensor
+            The right Cauchy-Green strain in Voigt notation.
+
+        Returns
+        -------
+        C : tensorflow.Tensor
+            The first Piola-Kirchhoff stress in Voigt notation.
+
+        """
         for l in self.ls:
             C = l(C)
         return C
     
-class WI(tf.keras.Model):
-        def __init__(self,
-                     nlayers=3,
-                     units=8):
-            super(WI, self).__init__()
-            self.ls = [layers.Dense(units, activation="softplus",
-                                    kernel_constraint=non_neg(), 
-                                    input_shape=(6,))]
-            for l in range(nlayers - 1):
-                self.ls += [layers.Dense(units, activation="softplus",
-                                         kernel_constraint=non_neg())]
-            self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
+class ModelWI(tf.keras.Model):
+    """
+    ICNN that models the strain energy based on invariants.
+
+    Parameters
+    ----------
+    invariants : function
+        A function that computes the invariants and takes F as input.
+    nlayers : int, optional
+        Number of hidden layers. The default is 3.
+    units : int, optional
+        Number of nodes per hidden layer. The default is 8.
+        
+    Attributes
+    ----------
+    ls : list
+        The list of hidden layers.
+    invariants : function
+        The function that computes the invariants and takes F as input.
+        
+    Methods
+    -------
+    call:
+        Evaluate the ICNN.
+        
+    """
+    def __init__(self,
+                 invariants,
+                 nlayers=3,
+                 units=8):
+        super(ModelWI, self).__init__()
+        self.ls = [layers.Dense(units, activation="softplus",
+                                kernel_constraint=non_neg(), 
+                                input_shape=(6,))]
+        for l in range(nlayers - 1):
+            self.ls += [layers.Dense(units, activation="softplus",
+                                     kernel_constraint=non_neg())]
+        self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
+        self.invariants = invariants
+        
+    def call(self, F):
+        """
+        Evaluate the ICNN.
+
+        Parameters
+        ----------
+        F : tensorflow.Tensor
+            The deformation gradient.
+
+        Returns
+        -------
+        P : tensorflow.Tensor
+            The first Piola-Kirchhoff-stress.
+        W : tensorflow.Tensor
+            The strain energy.
+
+        """
+        P , W = PiolaKirchhoff()(F, self.invariants, self._strain_energy)
+        return P, W
+    
+    def _strain_energy(self, I):
+        """The evaluation of the hidden layers to model the energy."""
+        for l in self.ls:
+            I = l(I)
+        return I
+        
+class ModelWF(tf.keras.Model):
+    """
+    ICNN that models the strain energy based on the polyconvexity condition.
+
+    Parameters
+    ----------
+    nlayers : int, optional
+        Number of hidden layers. The default is 3.
+    units : int, optional
+        Number of nodes per hidden layer. The default is 8.
+        
+    Attributes
+    ----------
+    ls : list
+        The list of hidden layers.
+        
+    Methods
+    -------
+    call:
+        Evaluate the ICNN.
+        
+    """
+    def __init__(self,
+                 nlayers=3,
+                 units=8):
+        super(ModelWF, self).__init__()
+        self.ls = [layers.Dense(units, activation="softplus", 
+                                input_shape=(19,))]
+        for l in range(nlayers - 1):
+            self.ls += [layers.Dense(units, activation="softplus",
+                                     kernel_constraint=non_neg())]
+        self.ls += [layers.Dense(1, kernel_constraint=non_neg())]
+        
+    def call(self, F):
+        """
+        Evaluate the ICNN.
+
+        Parameters
+        ----------
+        F : tensorflow.Tensor
+            The deformation gradient.
+
+        Returns
+        -------
+        P : tensorflow.Tensor
+            The first Piola-Kirchhoff-stress.
+        W : tensorflow.Tensor
+            The strain energy.
+
+        """
+        with tf.GradientTape() as tape:
+            tape.watch(F)
             
-        def call(self, F):
-            P , W = PiolaKirchhoffTransIso()(F, self._strain_energy)
-            return P, W
-        
-        def _strain_energy(self, I):
-            for l in self.ls:
-                I = l(I)
-            return I
-        
-# if __name__ == "__main__":
-#     import os
-#     import tensorflow as tf
-#     from data import load_data, load_invariants, plot_load_path
-#     from data import loc_bcc_uniaxial, loc_bcc_shear, loc_bcc_biaxial
-#     from data import loc_biaxial_test, loc_mixed_test
-#     from models import MS, WI
-#     from utils import weight_L2, voigt_to_tensor, tensor_to_voigt
-#     from data import plot_load_path
+            # compute cofactor and determinant
+            F = voigt_to_tensor(F)
+            cofF = cofactor(F)
+            detF = tf.reshape(det(F), (-1,1))
+            F = tensor_to_voigt(F)
+            cofF = tensor_to_voigt(cofF)
+            
+            # evaluate energy
+            inp = tf.concat([F, cofF, detF], axis=1)
+            W = self._strain_energy(inp)
+            
+        P = tape.gradient(W, F)
+
+        return P, W
     
-#     os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-#     os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-    
-#     # load data
-#     F_biaxial, C_biaxial, P_biaxial, W_biaxial = load_data(loc_bcc_biaxial)
-#     F_uniaxial, C_uniaxial, P_uniaxial, W_uniaxial = load_data(loc_bcc_uniaxial)
-#     F_shear, C_shear, P_shear, W_shear = load_data(loc_bcc_shear)
-    
-#     # compute sample weights
-#     weight = weight_L2(P_biaxial, P_uniaxial, P_shear)
-    
-#     training_in = tf.concat([F_biaxial, F_uniaxial, F_shear], axis=0)
-#     training_out = [tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0),
-#                     tf.concat([W_biaxial, W_uniaxial, W_shear], axis=0)]
-    
-#     sample_weight = weight
-#     loss_weights = None
-#     kwargs = {"nlayers": 3, "units": 16}
-#     epochs = 1000
-    
-#     model = WI(**kwargs)
-#     model.compile("adam", "mse", loss_weights=loss_weights)
-    
-#     # fit to data
-#     tf.keras.backend.set_value(model.optimizer.learning_rate, 0.002)
-#     h = model.fit(training_in, 
-#                   training_out, 
-#                   epochs=epochs, 
-#                   sample_weight=sample_weight,
-#                   verbose=2)
-    
-#     #%% interpolation
-#     P, W = model.predict(F_biaxial)
-#     plot_load_path(voigt_to_tensor(F_biaxial), voigt_to_tensor(P_biaxial))
-#     plot_load_path(voigt_to_tensor(F_biaxial), voigt_to_tensor(P))
-    
-    
+    def _strain_energy(self, inp):
+        """The evaluation of the hidden layers to model the energy."""
+        for l in self.ls:
+            inp = l(inp)
+        return inp
