@@ -1,17 +1,32 @@
 """
 Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
 Task 2: Hyperelasticity I
+Task 3: Hyperelasticity II
 
 ==================
 
 Authors: Henrik Hembrock, Jonathan Stollberg
 
-11/2022
+12/2022
 """
 import numpy as np
 import tensorflow as tf
 
 def deviator(field):
+    """
+    Compute the deviators for a batch of 3x3 tensors.
+
+    Parameters
+    ----------
+    field : tensorflow.Tensor
+        The batch of 3x3 tensors.
+
+    Returns
+    -------
+    deviator : tensorflow.Tensor
+        The batch of deviators.
+
+    """
     # define second order identity tensor
     n = len(field)
     I = tf.eye(3, batch_shape=[n], dtype=field.dtype)
@@ -24,6 +39,22 @@ def deviator(field):
     return deviator
 
 def equivalent(field, field_type):
+    """
+    Compute scalar equivalent quantities for a batch of 3x3 input tensors.
+
+    Parameters
+    ----------
+    field : tensorflow.Tensor
+        The batch of 3x3 tensors.
+    field_type : str
+        Identifier for the type of field, i.e. `"stress"` or `"strain"`.
+
+    Returns
+    -------
+    eq : tensorflow.Tensor
+        The batch of equivalent quantities.
+
+    """
     # get deviator
     dev = deviator(field)
 
@@ -41,6 +72,20 @@ def equivalent(field, field_type):
     return eq
 
 def weight_L2(*tensors):
+    """
+    Compute the weights for the loss weight strategy.
+
+    Parameters
+    ----------
+    *tensors : tensorflow.Tensor
+        The tensors to weight.
+
+    Returns
+    -------
+    weights : numpy.ndarray
+        The weights in the same order as the input tensors.
+
+    """
     weights = np.array([])
     for T in tensors:
         if len(T.shape) == 2:
@@ -54,7 +99,35 @@ def weight_L2(*tensors):
     return weights
     
 def tensor_to_voigt(tensor):
+    """
+    Convert a batch of 3x3 tensors to Voigt notation.
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The batch of tensors in 3x3 tensor notation.
+
+    Returns
+    -------
+    tensorflow.Tensor
+        The batch of input tensors in Voigt notation.
+
+    """
     return tf.reshape(tensor, (-1,9))
 
 def voigt_to_tensor(tensor):
+    """
+    Convert a batch of tensors from Voigt notation to 3x3 tensor notation.
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The batch of tensors in Voigt notation.
+
+    Returns
+    -------
+    tensorflow.Tensor
+        The batch of tensors in 3x3 tensor notation.
+
+    """
     return tf.reshape(tensor, (-1,3,3))
