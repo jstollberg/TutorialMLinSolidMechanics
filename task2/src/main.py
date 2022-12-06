@@ -10,6 +10,7 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 11/2022
 """
 import os
+import numpy as np
 import tensorflow as tf
 from data import load_data
 from data import loc_uniaxial, loc_pure_shear, loc_biaxial
@@ -19,6 +20,7 @@ from data import (loc_bcc_uniaxial, loc_bcc_biaxial, loc_bcc_planar,
 from models import ModelMS, ModelWI, ModelWF
 from models import InvariantsTransIso, InvariantsCubic
 from utils import weight_L2, voigt_to_tensor, tensor_to_voigt
+from utils import rotate, cubic_symmetries
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
