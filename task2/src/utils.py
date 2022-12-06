@@ -11,6 +11,7 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 """
 import numpy as np
 import tensorflow as tf
+from tensorflow.linalg import inv, det
 
 def deviator(field):
     """
@@ -155,3 +156,20 @@ def symmetric(tensor):
     """
     tensor = tensor.numpy()[:,[0,4,8,5,2,1]]
     return tf.convert_to_tensor(tensor)
+
+def cofactor(tensor):
+    """
+    Compute the cofactor of a batch of 3x3 tensors.
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The tensors.
+
+    Returns
+    -------
+    tensorflow.Tensor
+        The cofactor of each tensor.
+
+    """
+    return tf.reshape(det(tensor), (len(tensor),1,1))*inv(tensor)
