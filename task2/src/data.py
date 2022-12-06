@@ -9,16 +9,15 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 11/2022
 """
 import os
+import random
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
-from utils import tensor_to_voigt, voigt_to_tensor, equivalent, weight_L2
+from utils import tensor_to_voigt, voigt_to_tensor, symmetric
 from models import (InvariantsTransIso, StrainEnergyTransIso, 
                     PiolaKirchhoffTransIso)
-from models import (InvariantsCubic)
-from random import randrange
 
+# depending on the system one of these two base paths should work
 # loc_base = os.path.join(".", "task2", "data")
 loc_base = os.path.join(".", "..", "data")
 
@@ -28,43 +27,114 @@ loc_pure_shear = (os.path.join(loc_base, "calibration", "pure_shear.txt"),
                   os.path.join(loc_base, "invariants", "I_pure_shear.txt"))
 loc_uniaxial = (os.path.join(loc_base, "calibration", "uniaxial.txt"),
                 os.path.join(loc_base, "invariants", "I_uniaxial.txt"))
-loc_path_data = (os.path.join(loc_base, "concentric"))
 
-loc_path_bcc = (os.path.join(loc_base, "soft_beam_lattice_metamaterials",
-                             "data"))
+loc_biaxial_test = (os.path.join(loc_base, "test", "biax_test.txt"),
+                    os.path.join(loc_base, "invariants", "I_biax_test.txt"))
+loc_mixed_test = (os.path.join(loc_base, "test", "mixed_test.txt"),
+                  os.path.join(loc_base, "invariants", "I_mixed_test.txt"))
+
+loc_concentric = os.path.join(loc_base, "concentric")
+
+loc_path_bcc = os.path.join(loc_base, "soft_beam_lattice_metamaterials")
 loc_bcc_uniaxial = os.path.join(loc_path_bcc, "BCC_uniaxial.txt")
 loc_bcc_biaxial = os.path.join(loc_path_bcc, "BCC_biaxial.txt")
 loc_bcc_planar = os.path.join(loc_path_bcc, "BCC_planar.txt")
 loc_bcc_shear = os.path.join(loc_path_bcc, "BCC_shear.txt")
 loc_bcc_volumetric = os.path.join(loc_path_bcc, "BCC_volumetric.txt")
 
-loc_biaxial_test = os.path.join(loc_base, "test", "biax_test.txt")
-loc_mixed_test = os.path.join(loc_base, "test", "mixed_test.txt")
+def load_random_gradient_data(folder, sample_size):
+    """
+    Load deformation gradient data from text files and randomly split into
+    sample and test data.
 
+    Parameters
+    ----------
+    folder : str
+        The folder where the text files are stored.
+    sample_size : int
+        Number of load cases used for calibration.
 
-# Randomly pick N load paths from concentric folder
-# F11 F12 F13 F21 F22 F23 F31 F32 F33
-def load_rand_path_data(N, loc, count=100, lines=50):
-    F = np.empty((N*lines, 9))
+    Returns
+    -------
+    F_samples : tensorflow.Tensor
+        The calibration data.
+    F_test : tensorflow.Tensor
+        The test data.
 
-    for i in range(N):
-        start, stop = i*50, i*50+50
-        ind = randrange(1, 100)
-        loc_n = (os.path.join(loc, str(ind)+".txt"))
-        data = np.loadtxt(loc_n)
-        print("read file " + str(ind) + ".txt")
-        F[start:stop, :] = data
+    """
+    # collect all data
+    F = []
+    for file in os.listdir(folder):
+        if file.endswith(".txt"):
+            file = os.path.join(folder, file)
+            data = np.loadtxt(file)
+            
+            # skip file in case it is not formatted correctly
+            if data.shape[1] != 9:
+                continue
+            F.append(data)
+    F = np.array(F)
+            
+    if sample_size >= len(F):
+        raise RuntimeError("sample_size too large.")
+        
+    # take random load cases for calibration
+    all_indices = np.arange(len(F))
+    sample_indices = random.sample(all_indices.tolist(), sample_size)
+    sample_indices = np.array(sample_indices)
+    test_indices = np.setdiff1d(all_indices, sample_indices)
+    F_samples = tf.convert_to_tensor(F[sample_indices])
+    F_test = tf.convert_to_tensor(F[test_indices])
     
-    return F
+    # Reshape so we get one stack of data
+    F_samples = tf.reshape(F_samples, (-1,9))
+    F_test = tf.reshape(F_test, (-1,9))
+    
+    return F_samples, F_test
 
 def load_data(file, a=1.0, voigt=True):
-    data = np.loadtxt(file)
+    """
+    Read in deformation gradient, stress and energy data from a text file.
     
-    # convert numpy array to tensorflow tensor
-    F = tf.convert_to_tensor(data[:,[0,1,2,3,4,5,6,7,8]])
-    P = tf.convert_to_tensor(data[:,[9,10,11,12,13,14,15,16,17]])
-    W = tf.reshape(tf.convert_to_tensor(data[:,18]), (-1,1))
+    The text file must be formatted in order (F11, F12, F13, F21, F22, F23,
+    F31, F32, F33, P11, P12, P13, P21, P22, P23, P31, P32, P33, W). The stress
+    and energy data can be scaled with parameter `a`.
+
+    Parameters
+    ----------
+    file : str
+        The paths to the text file.
+    a : float, optional
+        The scaling parameter for stress and energy. If this is set to `None`,
+        the data will be scaled so that the stress is between -1 and 1. The 
+        default is 1.0.
+    voigt : bool, optional
+        If `True`, the data will be returned in Voigt notation. The default is 
+        `True`.
+
+    Returns
+    -------
+    F : tensorflow.Tensor
+        The batch of deformation gradients.
+    C : tensorflow.Tensor
+        The batch of right Cauchy-Green-strains.
+    P : tensorflow.Tensor
+        the batch of first Piola-Kirchhoff-stresses.
+    W : tensorflow.Tensor
+        the batch of strain energies.
+
+    """
+    try:
+        data = np.loadtxt(file)
     
+        # convert numpy array to tensorflow tensor
+        F = tf.convert_to_tensor(data[:,[0,1,2,3,4,5,6,7,8]])
+        P = tf.convert_to_tensor(data[:,[9,10,11,12,13,14,15,16,17]])
+        W = tf.reshape(tf.convert_to_tensor(data[:,18]), (-1,1))
+        
+    except Exception:
+        raise RuntimeError("Could not read in the data file")
+
     # convert to tensor notation
     F = voigt_to_tensor(F)
     P = voigt_to_tensor(P)
@@ -74,16 +144,43 @@ def load_data(file, a=1.0, voigt=True):
     if voigt:
         F = tensor_to_voigt(F)
         C = tensor_to_voigt(C)
+        C = symmetric(C)
         P = tensor_to_voigt(P)
+        
+    # scale the stress and energy values
+    if a is None:
+        a = 1/tf.math.reduce_max(tf.math.abs(P))
+    P *= a
+    W *= a
 
-    return F, C, P*a, W*a
+    return F, C, P, W
 
 def load_invariants(file):
-    data = np.loadtxt(file)
-    I1 = data[:, 0]
-    J  = data[:, 1]
-    I4 = data[:, 2]
-    I5 = data[:, 3]
+    """
+    Read in the invariants from a text file.
+    
+    The text file must be formatted in order (I1, J, I4, I5).
+
+    Parameters
+    ----------
+    file : str
+        The path to the text file.
+
+    Returns
+    -------
+    ret : tensorflow.Tensor
+        The batch of invariants in order (I1, J, -J, I4, I5).
+
+    """
+    try:
+        data = np.loadtxt(file)
+        I1 = data[:, 0]
+        J  = data[:, 1]
+        I4 = data[:, 2]
+        I5 = data[:, 3]
+        
+    except Exception:
+        raise RuntimeError("Could not read in the data file.")
     
     # convert to tensor
     I1 = tf.convert_to_tensor(I1)
@@ -96,77 +193,25 @@ def load_invariants(file):
 
     return ret
 
-def plot_load_path(F, P):
-    # plot stress and strain in normal direction
-    F11, F22, F33 = F[:,0,0], F[:,1,1], F[:,2,2]
-    P11, P22, P33 = P[:,0,0], P[:,1,1], P[:,2,2]
-
-    fig1, ax1 = plt.subplots(dpi=600)
-    ax1.plot(F11, P11, label="11")
-    ax1.plot(F22, P22, label="22")
-    ax1.plot(F33, P33, label="33")
-    ax1.set(xlabel="deformation gradient",
-            ylabel="first Piola-Kirchhoff stress")
-    ax1.legend()
-    ax1.grid()
-
-    # plot stress and strain in shear direction
-    F12, F13, F21, F23, F31, F32 = (F[:,0,1], F[:,0,2], F[:,1,0], F[:,1,2],
-                                    F[:,2,0], F[:,2,1])
-    P12, P13, P21, P23, P31, P32 = (P[:,0,1], P[:,0,2], P[:,1,0], P[:,1,2],
-                                    P[:,2,0], P[:,2,1])
-
-    fig2, ax2 = plt.subplots(dpi=600)
-    ax2.plot(F12, P12, label="12")
-    ax2.plot(F13, P13, label="13")
-    ax2.plot(F21, P21, label="21")
-    ax2.plot(F23, P23, label="23")
-    ax2.plot(F31, P31, label="31")
-    ax2.plot(F32, P32, label="32")
-    ax2.set(xlabel="deformation gradient",
-            ylabel="first Piola-Kirchhoff stress")
-    ax2.legend()
-    ax2.grid()
-
-    plt.show()
-    
-def plot_equivalent(F, P):
-    # compute equivalent quantities
-    F_eq = equivalent(F, "strain")
-    P_eq = equivalent(P, "stress")
-
-    fig, ax = plt.subplots(dpi=600)
-    ax.plot(F_eq, P_eq)
-    ax.set(xlabel="equivalent deformation gradient",
-           ylabel="equivalent first Piola-Kirchhoff stress")
-    ax.grid()
-    plt.show()
-
 if __name__ == "__main__":
-    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
-
-    # setup
-    data_file, invariants_file = loc_biaxial
-    data_file = loc_bcc_uniaxial
-    F_data, C_data, P_data, W_data = load_data(data_file)
+    # check if implementation works
+    data = [loc_uniaxial, 
+            loc_biaxial, 
+            loc_pure_shear, 
+            loc_biaxial_test, 
+            loc_mixed_test]
     
-    I = InvariantsCubic()(F_data)
-    
-    # load data
-    # F_data, C_data, P_data, W_data = load_data(data_file, voigt=True)
-    # I_data = load_invariants(invariants_file)
-    # path_data = load_rand_path_data(3, loc_path_data)
-    
-    # # evaluate invariants, energy and stress
-    # I = InvariantsTransIso()(F_data)
-    # P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
-    
-    # # check if the implementation is valid
-    # assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3)
-    # assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3)
-    # assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3)
-    
-    # plot load path
-    # plot_load_path(F_data, P)
-    # plot_equivalent(F_data, P)
+    for d in data:
+        F_data, C_data, P_data, W_data = load_data(d[0], a=1)
+        I_data = load_invariants(d[1])
+        
+        # evaluate invariants, energy and stress
+        I = InvariantsTransIso()(F_data)
+        P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
+        
+        # check if the implementation is valid
+        assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3), d
+        assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3), d
+        assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3), d
+        
+    print("OK")
