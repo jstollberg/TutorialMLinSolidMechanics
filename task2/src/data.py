@@ -1,12 +1,13 @@
 """
 Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
 Task 2: Hyperelasticity I
+Task 3: Hyperelasticity II
 
 ==================
 
 Authors: Henrik Hembrock, Jonathan Stollberg
 
-11/2022
+12/2022
 """
 import os
 import random
@@ -14,8 +15,8 @@ import numpy as np
 import tensorflow as tf
 
 from utils import tensor_to_voigt, voigt_to_tensor, symmetric
-from models import (InvariantsTransIso, StrainEnergyTransIso, 
-                    PiolaKirchhoffTransIso)
+from models import InvariantsTransIso, StrainEnergyTransIso
+from models import PiolaKirchhoff
 
 # depending on the system one of these two base paths should work
 # loc_base = os.path.join(".", "task2", "data")
@@ -207,7 +208,9 @@ if __name__ == "__main__":
         
         # evaluate invariants, energy and stress
         I = InvariantsTransIso()(F_data)
-        P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
+        P, W = PiolaKirchhoff()(F_data, 
+                                InvariantsTransIso(),
+                                StrainEnergyTransIso())
         
         assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3), d
         assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3), d
