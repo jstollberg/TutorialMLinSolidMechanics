@@ -73,7 +73,7 @@ def equivalent(field, field_type):
 
 def weight_L2(*tensors):
     """
-    Compute the weights for the loss weight strategy.
+    Compute weights based on the L2 norm for the loss weight strategy.
 
     Parameters
     ----------
@@ -100,7 +100,7 @@ def weight_L2(*tensors):
     
 def tensor_to_voigt(tensor):
     """
-    Convert a batch of 3x3 tensors to Voigt notation.
+    Convert a batch of (nonsymmetric) 3x3 tensors to Voigt notation.
 
     Parameters
     ----------
@@ -117,7 +117,10 @@ def tensor_to_voigt(tensor):
 
 def voigt_to_tensor(tensor):
     """
-    Convert a batch of tensors from Voigt notation to 3x3 tensor notation.
+    Convert a batch of (nonsymmetric) tensors from Voigt notation to 3x3 
+    tensor notation.
+    
+    The output order will be (11, 12, 13, 21, 22, 23, 31, 32, 33).
 
     Parameters
     ----------
@@ -131,3 +134,24 @@ def voigt_to_tensor(tensor):
 
     """
     return tf.reshape(tensor, (-1,3,3))
+
+def symmetric(tensor):
+    """
+    Reduce symmetric tensors in 9 component Voigt notation to 6 independent
+    components.
+    
+    The output order will be (11, 22, 33, 23, 13, 12).
+
+    Parameters
+    ----------
+    tensor : tensorflow.Tensor
+        The batch of symmetric tensors in 9 component Voigt notation.
+
+    Returns
+    -------
+    tensorflow.Tensor
+        The batch of symmetric tensors in 6 component Voigt notation.
+
+    """
+    tensor = tensor.numpy()[:,[0,4,8,5,2,1]]
+    return tf.convert_to_tensor(tensor)
