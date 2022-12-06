@@ -209,7 +209,6 @@ if __name__ == "__main__":
         I = InvariantsTransIso()(F_data)
         P, W = PiolaKirchhoffTransIso()(F_data, StrainEnergyTransIso())
         
-        # check if the implementation is valid
         assert np.allclose(I.numpy(), I_data.numpy(), rtol=1e-3, atol=1e-3), d
         assert np.allclose(W.numpy(), W_data.numpy(), rtol=1e-3, atol=1e-3), d
         assert np.allclose(P.numpy(), P_data.numpy(), rtol=1e-3, atol=1e-3), d
