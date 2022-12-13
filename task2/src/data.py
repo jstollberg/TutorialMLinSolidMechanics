@@ -89,7 +89,6 @@ def load_random_gradient_data(folder, sample_size):
     
     # Reshape so we get one stack of data
     F_samples = tf.reshape(F_samples, (-1,9))
-    F_test = tf.reshape(F_test, (-1,9))
     
     return F_samples, F_test
 
