@@ -11,7 +11,7 @@ Authors: Henrik Hembrock, Jonathan Stollberg
 """
 import numpy as np
 import tensorflow as tf
-from tensorflow.linalg import inv, det, matmul
+from tensorflow.linalg import inv, det, matmul, matrix_transpose
 from tensorflow.math import sin, cos
 
 def deviator(field):
@@ -174,6 +174,32 @@ def cofactor(tensor):
 
     """
     return tf.reshape(det(tensor), (len(tensor),1,1))*inv(tensor)
+
+def right_cauchy_green(F):
+    """
+    Compute the right Cauchy-Green strain tensor.
+
+    Parameters
+    ----------
+    F : tensorflow.Tensor
+        The deformation gradient.
+
+    Returns
+    -------
+    tensorflow.Tensor
+        The right Cauchy-Green tensor.
+
+    """
+    voigt = False
+    if len(F.shape) == 2:
+        F = voigt_to_tensor(F)
+        voigt = True 
+        
+    C = matmul(matrix_transpose(F), F)
+    if voigt:
+        C = tensor_to_voigt(C)
+        C = symmetric(C)
+    return C
 
 def rotate(tensor, angle, axis, from_left=True):
     """
