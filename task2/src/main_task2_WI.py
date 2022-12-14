@@ -80,8 +80,8 @@ label_map = {0: "$11$", 1: "$12$"}
 fig1, ax1 = plt.subplots(dpi=600)
 ax1.semilogy(h[0].history["loss"], label="training loss")
 plt.grid(which="both")
-plt.xlabel("calibration epoch", labelpad=-1)
-plt.ylabel(r"log$_{10}$ MSE", labelpad=-1)
+plt.xlabel("calibration epoch", labelpad=-0.1)
+plt.ylabel(r"log$_{10}$ MSE")
 plt.savefig("ICNN_WI_loss.pdf")
 
 # visualize stress prediction
@@ -133,8 +133,8 @@ for i in components:
              color="black",
              marker="o")
     
-plt.xlabel(r"$F_{ij}$", labelpad=-1)
-plt.ylabel(r"$P_{ij}$", labelpad=-1)
+plt.xlabel(r"$F_{ij}$", labelpad=-0.1)
+plt.ylabel(r"$P_{ij}$")
 plt.grid()
 plt.legend(ncol=3, columnspacing=0.5)
 plt.savefig("ICNN_WI_stress.pdf")
@@ -166,8 +166,8 @@ ax3.plot(test_data[1][:,i], test_data[1][:,i],
          linestyle="--"
          )
 
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-1)
-plt.ylabel(r"$P_{12}$ (model)", labelpad=-1)
+plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
+plt.ylabel(r"$P_{12}$ (model)")
 plt.grid()
 plt.legend()
 plt.savefig("ICNN_WI_PvsP.pdf")
@@ -187,8 +187,8 @@ ax4.plot(test_data[0][:,0], test_data[2],
          color="black",
          marker="o")
 
-plt.xlabel(r"$F_{11}$", labelpad=-1)
-plt.ylabel(r"$W$", labelpad=-1)
+plt.xlabel(r"$F_{11}$", labelpad=-0.1)
+plt.ylabel(r"$W$")
 plt.grid()
 plt.savefig("ICNN_WI_energy.pdf")
 

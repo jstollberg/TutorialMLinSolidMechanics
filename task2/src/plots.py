@@ -1,52 +1,80 @@
-# -*- coding: utf-8 -*-
 """
-Created on Tue Dec  6 18:23:34 2022
+Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
+Task 2: Hyperelasticity I
+Task 3: Hyperelasticity II
 
-@author: jonat
+==================
+
+Authors: Henrik Hembrock, Jonathan Stollberg
+
+12/2022
 """
+import tensorflow as tf
+import matplotlib as plt
+import matplotlib.patches as mpatches
 
-# def plot_load_path(F, P):
-#     # plot stress and strain in normal direction
-#     F11, F22, F33 = F[:,0,0], F[:,1,1], F[:,2,2]
-#     P11, P22, P33 = P[:,0,0], P[:,1,1], P[:,2,2]
+label_map = {0: "$P_{11}$", 1: "$P_{12}$", 2: "$P_{13}$",
+             3: "$P_{21}$", 4: "$P_{22}$", 5: "$P_{23}$",
+             6: "$P_{31}$", 7: "$P_{32}$", 8: "$P_{33}$"}
+color_map = {0: "#ecbc00", 1: "#324379", 2: "#dedede",
+             3: "#5c86c4", 4: "#f99c00", 5: "#dedede",
+             6: "#dedede", 7: "#dedede", 8: "#bf3c3c"}
 
-#     fig1, ax1 = plt.subplots(dpi=600)
-#     ax1.plot(F11, P11, label="11")
-#     ax1.plot(F22, P22, label="22")
-#     ax1.plot(F33, P33, label="33")
-#     ax1.set(xlabel="deformation gradient",
-#             ylabel="first Piola-Kirchhoff stress")
-#     ax1.legend()
-#     ax1.grid()
+def plot_stress_strain(ax, 
+                       strain, 
+                       stress, 
+                       strain_component, 
+                       stress_components, 
+                       reference_stress=None):
+    handles = []
+    for i in stress_components:
+        ax.plot(strain[:,strain_component], stress[:,i],
+                linestyle="-",
+                linewidth=2,
+                color=color_map[i]
+                )
+        handles.append(mpatches.Patch(color=color_map[i], label=label_map[i]))
+        
+        if reference_stress is not None:
+            ax.plot(strain[:,strain_component], reference_stress[:,i], 
+                    linewidth=0, 
+                    markevery=10, 
+                    markersize=4, 
+                    markerfacecolor=color_map[i],
+                    color=color_map[i],
+                    marker="o")
+            
+    return handles
 
-#     # plot stress and strain in shear direction
-#     F12, F13, F21, F23, F31, F32 = (F[:,0,1], F[:,0,2], F[:,1,0], F[:,1,2],
-#                                     F[:,2,0], F[:,2,1])
-#     P12, P13, P21, P23, P31, P32 = (P[:,0,1], P[:,0,2], P[:,1,0], P[:,1,2],
-#                                     P[:,2,0], P[:,2,1])
-
-#     fig2, ax2 = plt.subplots(dpi=600)
-#     ax2.plot(F12, P12, label="12")
-#     ax2.plot(F13, P13, label="13")
-#     ax2.plot(F21, P21, label="21")
-#     ax2.plot(F23, P23, label="23")
-#     ax2.plot(F31, P31, label="31")
-#     ax2.plot(F32, P32, label="32")
-#     ax2.set(xlabel="deformation gradient",
-#             ylabel="first Piola-Kirchhoff stress")
-#     ax2.legend()
-#     ax2.grid()
-
-#     plt.show()
+def plot_stress_stress(ax,
+                       reference_stress,
+                       stress,
+                       components):
+    handles = []
+    max_stresses = []
+    min_stresses = []
+    for i in components:
+        maximum = tf.math.reduce_max(tf.math.abs(reference_stress[:,i]))
+        ax.plot(reference_stress[:,i]/maximum, stress[:,i]/maximum,
+                linestyle="-",
+                linewidth=2,
+                color=color_map[i]
+                )
+        handles.append(mpatches.Patch(color=color_map[i], label=label_map[i]))
+        
+        max_stresses.append(tf.math.reduce_max(reference_stress[:,i])/maximum)
+        min_stresses.append(tf.math.reduce_min(reference_stress[:,i])/maximum)
+        
+    maximum = max(max_stresses)
+    minimum = min(min_stresses)
+    ax.plot([minimum, maximum],
+            [minimum, maximum],
+            linestyle="--",
+            linewidth=1.5,
+            color="black"
+            )
     
-# def plot_equivalent(F, P):
-#     # compute equivalent quantities
-#     F_eq = equivalent(F, "strain")
-#     P_eq = equivalent(P, "stress")
+    return handles
 
-#     fig, ax = plt.subplots(dpi=600)
-#     ax.plot(F_eq, P_eq)
-#     ax.set(xlabel="equivalent deformation gradient",
-#            ylabel="equivalent first Piola-Kirchhoff stress")
-#     ax.grid()
-#     plt.show()
+def plot_energy():
+    pass

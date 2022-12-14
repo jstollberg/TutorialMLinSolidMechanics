@@ -82,13 +82,13 @@ P_MS = model_MS.predict(C_test)
 
 #%% Plot results for FFNN
 color_map = {0: "#0083CC", 1: "gray"}
-label_map = {0: "11", 1: "12"}
+label_map = {0: "$11$", 1: "$12$"}
 
 # visualize training loss
 fig1, ax1 = plt.subplots(dpi=600)
 ax1.semilogy(h_MS.history["loss"], label="training loss")
 plt.grid(which="both")
-plt.xlabel("calibration epoch")
+plt.xlabel("calibration epoch", labelpad=-0.1)
 plt.ylabel(r"log$_{10}$ MSE")
 plt.savefig(f"FFNN_MS_loss_{sample_size}.pdf")
 
@@ -112,8 +112,8 @@ for i in components:
               color="black",
               marker="o")
     
-plt.xlabel(r"$C_{ij}$", labelpad=-1)
-plt.ylabel(r"$P_{ij}$", labelpad=-1)
+plt.xlabel(r"$C_{ij}$", labelpad=-0.1)
+plt.ylabel(r"$P_{ij}$")
 plt.grid()
 plt.legend(ncol=3, columnspacing=0.5)
 plt.savefig(f"FFNN_MS_stress_{load_i}_{sample_size}.pdf")
@@ -133,8 +133,8 @@ ax3.plot(test_data[1][:,1], test_data[1][:,1],
           linestyle="--"
           )
     
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-1)
-plt.ylabel(r"$P_{12}$ (model)", labelpad=-1)
+plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
+plt.ylabel(r"$P_{12}$ (model)")
 plt.grid()
 plt.savefig(f"FFNN_MS_PvsP_{load_i}__{sample_size}.pdf")
 
@@ -173,8 +173,8 @@ for i in components:
              color="black",
              marker="o")
     
-plt.xlabel(r"$F_{ij}$", labelpad=-1)
-plt.ylabel(r"$P_{ij}$", labelpad=-1)
+plt.xlabel(r"$F_{ij}$", labelpad=-0.1)
+plt.ylabel(r"$P_{ij}$")
 plt.grid()
 plt.legend(ncol=3, columnspacing=0.5)
 plt.savefig(f"ICNN_WI_stress_{load_i}_{sample_size}.pdf")
@@ -193,8 +193,8 @@ ax6.plot(test_data[1][:,i], test_data[1][:,i],
          linestyle="--"
          )
 
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-1)
-plt.ylabel(r"$P_{12}$ (model)", labelpad=-1)
+plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
+plt.ylabel(r"$P_{12}$ (model)")
 plt.grid()
 plt.savefig(f"ICNN_WI_PvsP_{load_i}_{sample_size}.pdf")
 

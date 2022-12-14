@@ -49,20 +49,18 @@ F_shear, C_shear, P_shear, W_shear = load_data(loc_pure_shear[0])
  P_bcc_volumentric, W_bcc_volumentric) = load_data(loc_bcc_volumetric)
 
 #%% setup
-NN_type = "WF"  # options: MS, WI, WF
+NN_type = "WI"  # options: MS, WI, WF
 invariants = InvariantsTransIso()
 sample_weight = weight_L2(P_uniaxial, P_biaxial, P_shear)
 loss_weights = None
 kwargs = {"nlayers": 3, "units": 16}
-epochs = 100
-
-test_data = F_mixed_test
+epochs = 2500
 
 if NN_type == "MS":
     training_in = tf.concat([C_biaxial, C_uniaxial, C_shear], axis=0)
     training_out = tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0)
     
-elif NN_type == "WF":
+elif NN_type == "WI":
     training_in = tf.concat([F_biaxial, F_uniaxial, F_shear], axis=0)
     training_out = [tf.concat([P_biaxial, P_uniaxial, P_shear], axis=0),
                     tf.concat([W_biaxial, W_uniaxial, W_shear], axis=0)]
@@ -92,6 +90,7 @@ h = model.fit(training_in,
 
 #%% prediction
 
+test_data = F_mixed_test
 if NN_type == "MS":
     P = model.predict(test_data)
 elif NN_type == "WI":
@@ -100,3 +99,71 @@ elif NN_type == "WF":
     P, W = model.predict(test_data)
     
 #%% plot results
+
+P1, W1 = model.predict(F_biaxial_test)
+
+component_map = {0: "11", 1: "12", 3: "13",
+                 4: "21", 5: "22", 6: "23",
+                 6: "31", 7: "32", 8: "33"}
+
+components = [0,1]
+
+import matplotlib.pyplot as plt
+plt.rcParams.update({"text.usetex": True,
+                      "font.size": 14
+                      })
+
+fig1, ax1 = plt.subplots(dpi=600)
+ax1.semilogy(h.history['loss'], label='training loss')
+plt.grid(which='both')
+plt.xlabel('calibration epoch')
+plt.ylabel('log$_{10}$ MSE')
+
+fig, ax = plt.subplots(dpi=600)
+
+ax.plot(F_mixed_test[:,0], W,
+        label=component_map[0],
+        linestyle="-",
+        linewidth=2,
+        color="#0083CC"
+        )
+
+ax.plot(F_mixed_test[:,0], W_mixed_test, 
+        linewidth=0, 
+        markevery=5, 
+        markersize=2.5, 
+        markerfacecolor="black",
+        color="black",
+        marker="o")
+
+# ax.plot(F_mixed_test[:,0], P[:,0],
+#         label=component_map[0],
+#         linestyle="-",
+#         linewidth=2,
+#         color="#0083CC"
+#         )
+
+# ax.plot(F_mixed_test[:,1], P[:,1],
+#         label=component_map[1],
+#         linestyle="-",
+#         linewidth=2,
+#         color="gray"
+#         )
+
+# for i in components:
+#     ax.plot(F_mixed_test[:,i], P_mixed_test[:,i], 
+#             linewidth=0, 
+#             markevery=5, 
+#             markersize=2.5, 
+#             markerfacecolor="black",
+#             color="black",
+#             marker="o")
+    
+plt.xlabel(r"$F_{11}$")
+plt.ylabel(r"$W$")
+
+    
+# plt.legend()
+plt.grid()
+
+plt.savefig("test1.pdf",bbox_inches='tight')

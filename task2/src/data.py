@@ -104,10 +104,6 @@ def load_data(file, a=1.0, voigt=True):
     ----------
     file : str
         The paths to the text file.
-    a : float, optional
-        The scaling parameter for stress and energy. If this is set to `None`,
-        the data will be scaled so that the stress is between -1 and 1. The 
-        default is 1.0.
     voigt : bool, optional
         If `True`, the data will be returned in Voigt notation. The default is 
         `True`.
@@ -138,7 +134,7 @@ def load_data(file, a=1.0, voigt=True):
     # convert to tensor notation
     F = voigt_to_tensor(F)
     P = voigt_to_tensor(P)
-    C = tf.linalg.matrix_transpose(F)*F
+    C = tf.linalg.matmul(tf.linalg.matrix_transpose(F), F)
     
     # convert to voigt notation if requested
     if voigt:
@@ -146,12 +142,6 @@ def load_data(file, a=1.0, voigt=True):
         C = tensor_to_voigt(C)
         C = symmetric(C)
         P = tensor_to_voigt(P)
-        
-    # scale the stress and energy values
-    if a is None:
-        a = 1/tf.math.reduce_max(tf.math.abs(P))
-    P *= a
-    W *= a
 
     return F, C, P, W
 
@@ -192,6 +182,30 @@ def load_invariants(file):
     ret = tf.stack([I1, J, -J, I4, I5], axis=1)
 
     return ret
+
+def scale_data(data, a=1.0):
+    """
+    Scale the data by multiplying it with a scaling parameter.
+
+    Parameters
+    ----------
+    data : tensorflow.Tensor
+        The data to scale.
+    a : float, optional
+        The scaling parameter. If this is set to `None`, the data will be 
+        scaled so that the data is between -1 and 1. The default is 1.0.
+
+    Returns
+    -------
+    data : tensorflow.Tensor
+        The scaled data.
+    a : float
+        The scaling parameter.
+
+    """
+    a = 1/tf.math.reduce_max(tf.math.abs(data))
+    data *= a
+    return data, a
 
 if __name__ == "__main__":
     # check if implementation works
