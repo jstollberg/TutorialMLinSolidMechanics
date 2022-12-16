@@ -16,7 +16,8 @@ from data import loc_uniaxial, loc_pure_shear, loc_biaxial
 from data import loc_biaxial_test, loc_mixed_test
 from models import ModelWI
 from models import InvariantsTransIso
-from utils import weight_L2
+from utils import weight_L2, tensor_to_voigt
+from plots import plot_stress_strain, plot_stress_stress, plot_energy
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({"text.usetex": True,
@@ -37,16 +38,22 @@ F_shear, C_shear, P_shear, W_shear = load_data(loc_pure_shear[0])
 (F_mixed_test, C_mixed_test, 
  P_mixed_test, W_mixed_test) = load_data(loc_mixed_test[0])
 
-#%% Setup
+#%% setup
 training_in = [F_biaxial, F_uniaxial, F_shear]
-training_out = [P_biaxial, P_uniaxial, P_shear]
-sample_weights = weight_L2(*training_out)
-kwargs = {"nlayers": 3, "units": 16}
-epochs = 4000
+training_out = [[P_biaxial, P_uniaxial, P_shear],
+                [W_biaxial, W_uniaxial, W_shear]]
 
-#%% Training
+training_in = [F_uniaxial]
+training_out = [[P_uniaxial], [W_uniaxial]]
+
+sample_weights = weight_L2(*training_out[0])
+kwargs = {"nlayers": 3, "units": 16}
+epochs = 10000
+
+#%% training
 training_in = tf.concat(training_in, axis=0)
-training_out = tf.concat(training_out, axis=0)
+training_out = [tf.concat(training_out[0], axis=0),
+                tf.concat(training_out[1], axis=0)]
 
 models = []
 h = []
@@ -61,9 +68,12 @@ for loss_weights in [[1,0],[0,1],[1,1]]:
                        verbose=2))
     models.append(model)
 
-#%% Testing
+#%% testing
 test_data = (F_mixed_test, P_mixed_test, W_mixed_test)
 # test_data = (F_biaxial_test, P_biaxial_test, W_biaxial_test)
+# test_data = (F_uniaxial, P_uniaxial, W_uniaxial)
+# test_data = (F_biaxial, P_biaxial, W_biaxial)
+# test_data = (F_shear, P_shear, W_shear)
 
 P = []
 W = []
@@ -72,137 +82,192 @@ for m in models:
     P.append(Pm)
     W.append(Wm)
 
-#%% Plot results
-color_map = {0: "#0083CC", 1: "gray"}
-label_map = {0: "$11$", 1: "$12$"}
+#%% plot deformation gradient vs. stress 
 
-# visualize training loss
+# normal components
+components = [0,4,8]
 fig1, ax1 = plt.subplots(dpi=600)
-ax1.semilogy(h[0].history["loss"], label="training loss")
-plt.grid(which="both")
-plt.xlabel("calibration epoch", labelpad=-0.1)
-plt.ylabel(r"log$_{10}$ MSE")
-plt.savefig("ICNN_WI_loss.pdf")
+for Pi in P:
+    plot_stress_strain(ax1, test_data[0], Pi, 0, components, test_data[1])
 
-# visualize stress prediction
+lines = ax1.get_lines()
+lines[6].set_linestyle("--")
+lines[8].set_linestyle("--")
+lines[10].set_linestyle("--")
+lines[12].set_linestyle(":")
+lines[14].set_linestyle(":")
+lines[16].set_linestyle(":")
+
+lines[0].set_label("$P_{11}$ ($\mathbf{P}$)")
+lines[2].set_label("$P_{22}$ ($\mathbf{P}$)")
+lines[4].set_label("$P_{33}$ ($\mathbf{P}$)")
+lines[6].set_label("$P_{11}$ ($W$)")
+lines[8].set_label("$P_{22}$ ($W$)")
+lines[10].set_label("$P_{33}$ ($W$)")
+lines[12].set_label("$P_{11}$ (both)")
+lines[14].set_label("$P_{22}$ (both)")
+lines[16].set_label("$P_{33}$ (both)")
+
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7, loc="upper left")
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$P_{ij}$")
+fig1.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_PvsF_normal.pdf")
+
+# shear components
+components = [1,3]
 fig2, ax2 = plt.subplots(dpi=600)
-components = [0,1]
-ax2.plot(test_data[0][:,0], P[0][:,0],
-         label=label_map[0] + r" ($\mathbf{P}$)",
-         linestyle="-",
-         linewidth=2,
-         color=color_map[0]
-         )
-ax2.plot(test_data[0][:,1], P[0][:,1],
-         label=label_map[1] + " ($\mathbf{P}$)",
-         linestyle="-",
-         linewidth=2,
-         color=color_map[1]
-         )
-ax2.plot(test_data[0][:,0], P[1][:,0],
-          label=label_map[0] + r" ($W$)",
-          linestyle="--",
-          linewidth=2,
-          color=color_map[0]
-          )
-ax2.plot(test_data[0][:,1], P[1][:,1],
-          label=label_map[1] + r" ($W$)",
-          linestyle="--",
-          linewidth=2,
-          color=color_map[1]
-          )
-ax2.plot(test_data[0][:,0], P[2][:,0],
-          label=label_map[0] + " (both)",
-          linestyle="-.",
-          linewidth=2,
-          color=color_map[0]
-          )
-ax2.plot(test_data[0][:,1], P[2][:,1],
-          label=label_map[1] + " (both)",
-          linestyle="-.",
-          linewidth=2,
-          color=color_map[1]
-          )
+for Pi in P:
+    plot_stress_strain(ax2, test_data[0], Pi, 1, components, test_data[1])
 
-for i in components:
-    ax2.plot(test_data[0][:,i], test_data[1][:,i], 
-             linewidth=0, 
-             markevery=5, 
-             markersize=2.5, 
-             markerfacecolor="black",
-             color="black",
-             marker="o")
-    
-plt.xlabel(r"$F_{ij}$", labelpad=-0.1)
-plt.ylabel(r"$P_{ij}$")
-plt.grid()
-plt.legend(ncol=3, columnspacing=0.5)
-plt.savefig("ICNN_WI_stress.pdf")
+lines = ax2.get_lines()
+lines[4].set_linestyle("--")
+lines[6].set_linestyle("--")
+lines[8].set_linestyle(":")
+lines[10].set_linestyle(":")
 
-# compare exact stress with interpolated stress
-i = 1  # 12-component
+lines[0].set_label("$P_{12}$ ($\mathbf{P}$)")
+lines[2].set_label("$P_{21}$ ($\mathbf{P}$)")
+lines[4].set_label("$P_{12}$ ($W$)")
+lines[6].set_label("$P_{21}$ ($W$)")
+lines[8].set_label("$P_{12}$ (both)")
+lines[10].set_label("$P_{21}$ (both)")
+
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7, loc="upper left")
+# plt.grid()
+plt.xlabel("$F_{12}$")
+plt.ylabel("$P_{ij}$")
+fig2.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_PvsF_shear.pdf")
+
+#%% plot calibration stress vs. model stress 
+
+# normal components
+components = [0,4,8]
 fig3, ax3 = plt.subplots(dpi=600)
-ax3.plot(test_data[1][:,i], P[0][:,i],
-         label=r"trained on $\mathbf{P}$",
-         linestyle="-",
-         linewidth=2,
-         color=color_map[i]
-         )
-ax3.plot(test_data[1][:,i], P[1][:,i],
-          label=r"trained on $W$",
-          linestyle="--",
-          linewidth=2,
-          color=color_map[i]
-          )
-ax3.plot(test_data[1][:,i], P[2][:,i],
-          label=r"trained on $\mathbf{P}$ and $W$",
-          linestyle="-.",
-          linewidth=2,
-          color=color_map[i]
-          )
-ax3.plot(test_data[1][:,i], test_data[1][:,i], 
-         linewidth=1.5, 
-         color="black",
-         linestyle="--"
-         )
+for Pi in P:
+    plot_stress_stress(ax3, test_data[1], Pi, components)
+    
+lines = ax3.get_lines()
 
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
-plt.ylabel(r"$P_{12}$ (model)")
-plt.grid()
-plt.legend()
-plt.savefig("ICNN_WI_PvsP.pdf")
+lines[4].set_linestyle("--")
+lines[5].set_linestyle("--")
+lines[6].set_linestyle("--")
+lines[8].set_linestyle(":")
+lines[9].set_linestyle(":")
+lines[10].set_linestyle(":")
 
-# visualize energy
+lines[0].set_label("$P_{11}$ ($\mathbf{P}$)")
+lines[1].set_label("$P_{22}$ ($\mathbf{P}$)")
+lines[2].set_label("$P_{33}$ ($\mathbf{P}$)")
+lines[4].set_label("$P_{11}$ ($W$)")
+lines[5].set_label("$P_{22}$ ($W$)")
+lines[6].set_label("$P_{33}$ ($W$)")
+lines[8].set_label("$P_{11}$ (both)")
+lines[9].set_label("$P_{22}$ (both)")
+lines[10].set_label("$P_{33}$ (both)")
+    
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("normed $P_{ij}$ (calibration data)")
+plt.ylabel("normed $P_{ij}$ (model)")
+fig3.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_PvsP_normal.pdf")
+
+# shear components
+components = [1,3]
 fig4, ax4 = plt.subplots(dpi=600)
-ax4.plot(test_data[0][:,0], W[0],
-         linestyle="-",
-         linewidth=2,
-         color="#0083CC"
-         )
-ax4.plot(test_data[0][:,0], test_data[2], 
-         linewidth=0, 
-         markevery=5, 
-         markersize=2.5, 
-         markerfacecolor="black",
-         color="black",
-         marker="o")
+for Pi in P:
+    plot_stress_stress(ax4, test_data[1], Pi, components)
+    
+lines = ax4.get_lines()
+lines[3].set_linestyle("--")
+lines[4].set_linestyle("--")
+lines[6].set_linestyle(":")
+lines[7].set_linestyle(":")
 
-plt.xlabel(r"$F_{11}$", labelpad=-0.1)
-plt.ylabel(r"$W$")
-plt.grid()
-plt.savefig("ICNN_WI_energy.pdf")
+lines[0].set_label("$P_{12}$ ($\mathbf{P}$)")
+lines[1].set_label("$P_{21}$ ($\mathbf{P}$)")
+lines[3].set_label("$P_{12}$ ($W$)")
+lines[4].set_label("$P_{21}$ ($W$)")
+lines[6].set_label("$P_{12}$ (both)")
+lines[7].set_label("$P_{21}$ (both)")
+    
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("normed $P_{ij}$ (calibration data)")
+plt.ylabel("normed $P_{ij}$ (model)")
+fig4.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_PvsP_shear.pdf")
 
-plt.show()
+#%% plot energy
+fig5, ax5 = plt.subplots(dpi=600)
+plot_energy(ax5, test_data[0], W[1], 0, test_data[2])
+plot_energy(ax5, test_data[0], W[2], 0, test_data[2])
 
-# check for undeformed reference
+lines = ax5.get_lines()
+lines[0].set_linestyle("--")
+lines[2].set_linestyle(":")
+
+lines[0].set_label("$W$ ($W$)")
+lines[2].set_label("$W$ (both)")
+
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$W$")
+fig5.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_WvsF_1.pdf")
+
+fig6, ax6 = plt.subplots(dpi=600)
+plot_energy(ax6, test_data[0], W[0], 0, test_data[2])
+
+lines = ax6.get_lines()
+lines[0].set_label("$W$ ($\mathbf{P}$)")
+
+plt.legend(ncol=3, handlelength=1.2, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$W$")
+fig6.tight_layout(pad=0.2)
+# plt.savefig("./WI_transiso_WvsF_2.pdf")
+
+#%% plot training_loss
+fig7, ax7 = plt.subplots(dpi=600)
+ax7.semilogy(h[0].history["loss"], label="training loss", color="black")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+fig7.tight_layout(pad=0.2)
+# plt.savefig("WI_transiso_loss_P.pdf")
+
+fig8, ax8 = plt.subplots(dpi=600)
+ax8.semilogy(h[1].history["loss"], label="training loss", color="black")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+fig8.tight_layout(pad=0.2)
+# plt.savefig("WI_transiso_loss_W.pdf")
+
+fig9, ax9 = plt.subplots(dpi=600)
+ax9.semilogy(h[2].history["loss"], label="training loss", color="black")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+fig9.tight_layout(pad=0.2)
+# plt.savefig("WI_transiso_loss_both.pdf")
+
+#%% check undeformed state
 F = tf.eye(3,3,batch_shape=(1,))
+F = tensor_to_voigt(F)
 for i, m in enumerate(models):
-    PP, WW = m.predict(F)
+    Pm, Wm = m.predict(F)
     print(f"i = {i}")
     print("P = ")
-    print(PP)
+    print(Pm)
     print("W = ")
-    print(WW)
+    print(Wm)
     print("")
     
 

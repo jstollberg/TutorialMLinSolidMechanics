@@ -37,30 +37,38 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 (F_bcc_shear, C_bcc_shear,
  P_bcc_shear, W_bcc_shear) = load_data(loc_bcc_shear)
 (F_bcc_volumetric, C_bcc_volumetric,
- P_bcc_volumetric, W_bcc_volumentric) = load_data(loc_bcc_volumetric)
+ P_bcc_volumetric, W_bcc_volumetric) = load_data(loc_bcc_volumetric)
 
 #%% setup
 training_in = [F_bcc_uniaxial, F_bcc_biaxial, F_bcc_shear, F_bcc_volumetric]
-training_out = [P_bcc_uniaxial, P_bcc_biaxial, P_bcc_shear, P_bcc_volumetric]
+training_out = [[P_bcc_uniaxial, P_bcc_biaxial, P_bcc_shear, P_bcc_volumetric],
+                [W_bcc_uniaxial, W_bcc_biaxial, W_bcc_shear, W_bcc_volumetric]]
 kwargs = {"nlayers": 3, "units": 16}
-epochs = 4000
+epochs = 10000
 
 #%% training
 training_in = tf.concat(training_in, axis=0)
-training_out = tf.concat(training_out, axis=0)
-training_out, a = scale_data(training_out, None)
+training_out = [tf.concat(training_out[0], axis=0),
+                tf.concat(training_out[1], axis=0)]
+training_out[0], a = scale_data(training_out[0], None)
+training_out[1] *= a
 
+loss_weights = [1,1]
 model_WI = ModelWI(InvariantsCubic(), **kwargs)
-model_WI.compile("adam", "mse", loss_weights=[1,0])
+model_WI.compile("adam", "mse", loss_weights=loss_weights)
 tf.keras.backend.set_value(model_WI.optimizer.learning_rate, 0.002)
 h_WI = model_WI.fit(training_in, 
                     training_out, 
                     epochs=epochs, 
-                    sample_weight=weight_L2(training_out),
+                    sample_weight=weight_L2(training_out[0]),
                     verbose=2)
 
-#%% testing
+# %% testing
 test_data = (F_bcc_planar, P_bcc_planar, W_bcc_planar)
+# test_data = (F_bcc_uniaxial, P_bcc_uniaxial, W_bcc_uniaxial)
+# test_data = (F_bcc_shear, P_bcc_shear, W_bcc_shear)
+# test_data = (F_bcc_biaxial, P_bcc_biaxial, W_bcc_biaxial)
+# test_data = (F_bcc_volumetric, P_bcc_volumetric, W_bcc_volumetric)
 P, W = model_WI.predict(test_data[0])
 P /= a
 W /= a
@@ -68,12 +76,15 @@ W /= a
 #%% plot results
 
 # plot deformation gradient vs. stress
+components = range(9)
 fig1, ax1 = plt.subplots(dpi=600)
-handles = plot_stress_strain(ax1, test_data[0], P, 0, range(9), test_data[1])
+handles = plot_stress_strain(ax1, test_data[0], P, 0, components, test_data[1])
 plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
 # plt.grid()
 plt.xlabel("$F_{11}$")
 plt.ylabel("$P_{ij}$")
+fig1.tight_layout(pad=0.2)
+# plt.savefig("./WI_cubic_PvsF.pdf")
 
 # plot calibration stress vs. model stress
 components = range(9)
@@ -83,5 +94,22 @@ plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
 # plt.grid()
 plt.xlabel("normed $P_{ij}$ (calibration data)")
 plt.ylabel("normed $P_{ij}$ (model)")
+fig2.tight_layout(pad=0.2)
+# plt.savefig("./WI_cubic_PvsP.pdf")
 
 # plot energy
+fig3, ax3 = plt.subplots(dpi=600)
+plot_energy(ax3, test_data[0], W, 0, test_data[2])
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$W$")
+fig3.tight_layout(pad=0.2)
+# plt.savefig("./WI_cubic_WvsF.pdf")
+
+# plot training_loss
+fig4, ax4 = plt.subplots(dpi=600)
+ax4.semilogy(h_WI.history["loss"], label="training loss", color="black")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+# plt.savefig("WI_cubic_loss.pdf")

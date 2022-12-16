@@ -19,6 +19,7 @@ from models import ModelMS, ModelWI
 from models import InvariantsTransIso
 from models import PiolaKirchhoff, StrainEnergyTransIso
 from utils import weight_L2, right_cauchy_green
+from plots import plot_stress_strain, plot_stress_stress, plot_energy
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({"text.usetex": True,
@@ -28,8 +29,8 @@ plt.rcParams.update({"text.usetex": True,
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
-#%% Load concentric data
-sample_size = 10
+#%% load concentric data
+sample_size = 90
 F_samples, F_test = load_random_gradient_data(loc_concentric, sample_size)
 
 P_samples, W_samples = PiolaKirchhoff()(F_samples, 
@@ -38,18 +39,18 @@ P_samples, W_samples = PiolaKirchhoff()(F_samples,
 
 C_samples = right_cauchy_green(F_samples)
 
-#%% Setup
+#%% setup
 sample_weights = weight_L2(P_samples)
 kwargs = {"nlayers": 3, "units": 16}
-epochs = 4000
+epochs = 10000
 
-#%% Training
+#%% training
 
 model_WI = ModelWI(InvariantsTransIso(), **kwargs)
-model_WI.compile("adam", "mse", loss_weights=[1,0])
+model_WI.compile("adam", "mse", loss_weights=[1,1])
 tf.keras.backend.set_value(model_WI.optimizer.learning_rate, 0.002)
 h_WI = model_WI.fit(F_samples, 
-                    P_samples, 
+                    [P_samples, W_samples], 
                     epochs=epochs, 
                     sample_weight=sample_weights,
                     verbose=2)
@@ -63,139 +64,92 @@ h_MS = model_MS.fit(C_samples,
                     sample_weight=sample_weights,
                     verbose=2)
 
-#%% Testing
+#%% testing
 
-# choose load path to test
+# choose random load path to test
 all_indices = np.arange(len(F_test))
-load_i = random.sample(all_indices.tolist(), 1)[0]
+i = random.sample(all_indices.tolist(), 1)[0]
 
 # define test data
-P_test, W_test = PiolaKirchhoff()(F_test[load_i], 
+P_test, W_test = PiolaKirchhoff()(F_test[i], 
                                   InvariantsTransIso(), 
                                   StrainEnergyTransIso())
-test_data = (F_test[load_i], P_test, W_test)
-C_test = right_cauchy_green(F_test[load_i])
+test_data = (F_test[i], P_test, W_test)
+C_test = right_cauchy_green(F_test[i])
 
 # predict stresses
 P_WI, W_WI = model_WI.predict(test_data[0])
 P_MS = model_MS.predict(C_test)
 
-#%% Plot results for FFNN
-color_map = {0: "#0083CC", 1: "gray"}
-label_map = {0: "$11$", 1: "$12$"}
+#%% plot results for FFNN
 
-# visualize training loss
+# plot strain vs. stress
+components = range(9)
 fig1, ax1 = plt.subplots(dpi=600)
-ax1.semilogy(h_MS.history["loss"], label="training loss")
-plt.grid(which="both")
-plt.xlabel("calibration epoch", labelpad=-0.1)
-plt.ylabel(r"log$_{10}$ MSE")
-plt.savefig(f"FFNN_MS_loss_{sample_size}.pdf")
+handles = plot_stress_strain(ax1, test_data[0], P_MS, 0, components, test_data[1])
+plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$P_{ij}$")
+fig1.tight_layout(pad=0.2)
+# plt.savefig(f"./MS_concentric_PvsF_{i}_{sample_size}.pdf")
 
-# visualize stress prediction
+# plot calibration stress vs. model stress
+components = range(9)
 fig2, ax2 = plt.subplots(dpi=600)
-components = [0,1]
-for i in components:
-    ax2.plot(C_test[:,i], P_MS[:,i],
-              label=label_map[i],
-              linestyle="-",
-              linewidth=2,
-              color=color_map[i]
-              )
+handles = plot_stress_stress(ax2, test_data[1], P_MS, components)
+plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("normed $P_{ij}$ (calibration data)")
+plt.ylabel("normed $P_{ij}$ (model)")
+fig2.tight_layout(pad=0.2)
+# plt.savefig(f"./MS_concentric_PvsP_{i}_{sample_size}.pdf")
 
-for i in components:
-    ax2.plot(C_test[:,i], test_data[1][:,i], 
-              linewidth=0, 
-              markevery=5, 
-              markersize=2.5, 
-              markerfacecolor="black",
-              color="black",
-              marker="o")
-    
-plt.xlabel(r"$C_{ij}$", labelpad=-0.1)
-plt.ylabel(r"$P_{ij}$")
-plt.grid()
-plt.legend(ncol=3, columnspacing=0.5)
-plt.savefig(f"FFNN_MS_stress_{load_i}_{sample_size}.pdf")
-
-# compare exact stress with interpolated stress
-i = 1  # 12-component
+# plot training_loss
 fig3, ax3 = plt.subplots(dpi=600)
-ax3.plot(test_data[1][:,1], P_MS[:,1],
-          label=label_map[i],
-          linestyle="-",
-          linewidth=2,
-          color=color_map[i]
-          )
-ax3.plot(test_data[1][:,1], test_data[1][:,1], 
-          linewidth=1.5, 
-          color="black",
-          linestyle="--"
-          )
-    
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
-plt.ylabel(r"$P_{12}$ (model)")
-plt.grid()
-plt.savefig(f"FFNN_MS_PvsP_{load_i}__{sample_size}.pdf")
-
-#%% Plot results for ICNN
-
-# visualize training loss
-fig4, ax4 = plt.subplots(dpi=600)
-ax4.semilogy(h_WI.history["loss"], label="training loss")
+ax3.semilogy(h_MS.history["loss"], label="training loss", color="black")
 plt.grid(which="both")
-plt.xlabel("calibration epoch", labelpad=-1)
-plt.ylabel(r"log$_{10}$ MSE", labelpad=-1)
-plt.savefig(f"ICNN_WI_loss_{sample_size}.pdf")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+# plt.savefig(f"MS_concentric_loss_{sample_size}.pdf")
 
-# visualize stress prediction
+#%% plot results for ICNN
+
+# plot deformation gradient vs. stress
+components = range(9)
+fig4, ax4 = plt.subplots(dpi=600)
+handles = plot_stress_strain(ax4, test_data[0], P_WI, 0, components, test_data[1])
+plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$P_{ij}$")
+fig1.tight_layout(pad=0.2)
+# plt.savefig(f"./WI_concentric_PvsF_{i}_{sample_size}.pdf")
+
+# plot calibration stress vs. model stress
+components = range(9)
 fig5, ax5 = plt.subplots(dpi=600)
-components = [0,1]
-ax5.plot(test_data[0][:,0], P_WI[:,0],
-         label=label_map[0],
-         linestyle="-",
-         linewidth=2,
-         color=color_map[0]
-         )
-ax5.plot(test_data[0][:,1], P_WI[:,1],
-         label=label_map[1],
-         linestyle="-",
-         linewidth=2,
-         color=color_map[1]
-         )
+handles = plot_stress_stress(ax5, test_data[1], P_WI, components)
+plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
+# plt.grid()
+plt.xlabel("normed $P_{ij}$ (calibration data)")
+plt.ylabel("normed $P_{ij}$ (model)")
+fig2.tight_layout(pad=0.2)
+# plt.savefig(f"./WI_concentric_PvsP_{i}_{sample_size}.pdf")
 
-for i in components:
-    ax5.plot(test_data[0][:,i], test_data[1][:,i], 
-             linewidth=0, 
-             markevery=5, 
-             markersize=2.5, 
-             markerfacecolor="black",
-             color="black",
-             marker="o")
-    
-plt.xlabel(r"$F_{ij}$", labelpad=-0.1)
-plt.ylabel(r"$P_{ij}$")
-plt.grid()
-plt.legend(ncol=3, columnspacing=0.5)
-plt.savefig(f"ICNN_WI_stress_{load_i}_{sample_size}.pdf")
-
-# compare exact stress with interpolated stress
-i = 1  # 12-component
+# plot energy
 fig6, ax6 = plt.subplots(dpi=600)
-ax6.plot(test_data[1][:,i], P_WI[:,i],
-         linestyle="-",
-         linewidth=2,
-         color=color_map[i]
-         )
-ax6.plot(test_data[1][:,i], test_data[1][:,i], 
-         linewidth=1.5, 
-         color="black",
-         linestyle="--"
-         )
+plot_energy(ax6, test_data[0], W_WI, 0, test_data[2])
+# plt.grid()
+plt.xlabel("$F_{11}$")
+plt.ylabel("$W$")
+fig3.tight_layout(pad=0.2)
+# plt.savefig(f"./WI_concentric_WvsF_{i}_{sample_size}.pdf")
 
-plt.xlabel(r"$P_{12}$ (data)", labelpad=-0.1)
-plt.ylabel(r"$P_{12}$ (model)")
-plt.grid()
-plt.savefig(f"ICNN_WI_PvsP_{load_i}_{sample_size}.pdf")
-
-plt.show()
+# plot training_loss
+fig4, ax4 = plt.subplots(dpi=600)
+ax4.semilogy(h_WI.history["loss"], label="training loss", color="black")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+# plt.savefig(f"./WI_concentric_loss_{sample_size}.pdf")
