@@ -90,7 +90,7 @@ def weight_L2(*tensors):
     """
     weights = np.array([])
     for T in tensors:
-        if len(T.shape) == 2:
+        if T.shape.ndims == 2:
             T = tf.reshape(T, (-1,3,3))
         
         norm = tf.norm(T, ord="fro", axis=[-2,-1])
@@ -191,7 +191,7 @@ def right_cauchy_green(F):
 
     """
     voigt = False
-    if len(F.shape) == 2:
+    if F.shape.ndims == 2:
         F = voigt_to_tensor(F)
         voigt = True 
         
@@ -238,7 +238,7 @@ def rotate(tensor, angle, axis, from_left=True):
     
     # check for voigt notation
     voigt = False
-    if len(tensor.shape) == 2:
+    if tensor.shape.ndims == 2:
         voigt = True
         tensor = voigt_to_tensor(tensor)
         

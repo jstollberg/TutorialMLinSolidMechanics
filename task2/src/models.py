@@ -35,7 +35,7 @@ class InvariantsTransIso(layers.Layer):
 
         """
         # convert to tensor notation if neccessary
-        if len(F.shape) == 2:
+        if F.shape.ndims == 2:
             F = voigt_to_tensor(F)
 
         # define transersely isotropic structural tensro
@@ -80,7 +80,7 @@ class InvariantsCubic(layers.Layer):
 
         """
         # convert to tensor notation if neccessary
-        if len(F.shape) == 2:
+        if F.shape.ndims == 2:
             F = voigt_to_tensor(F)
             
         double_dot_2 = lambda a, b: tf.einsum("mij,mij->m", a, b)
@@ -264,7 +264,7 @@ class ModelWI(tf.keras.Model):
         super(ModelWI, self).__init__()
         self.ls = [layers.Dense(units, activation="softplus",
                                 kernel_constraint=non_neg(), 
-                                input_shape=(6,))]
+                                input_shape=(9,))]
         for l in range(nlayers - 1):
             self.ls += [layers.Dense(units, activation="softplus",
                                      kernel_constraint=non_neg())]
