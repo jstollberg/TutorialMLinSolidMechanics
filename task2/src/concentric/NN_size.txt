@@ -1,2 +1,0 @@
-WI: läuft auch noch mit 1 hidden layer und 4 nodes gut
-MS: würde nicht kleiner als 3 layers und 16 nodes gehen
