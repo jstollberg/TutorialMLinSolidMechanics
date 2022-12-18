@@ -199,11 +199,12 @@ def scale_data(data, a=1.0):
     -------
     data : tensorflow.Tensor
         The scaled data.
-    a : float
+    a : tensorflow.Tensor
         The scaling parameter.
 
     """
-    a = 1/tf.math.reduce_max(tf.math.abs(data))
+    if a is None:
+        a = 1/tf.math.reduce_max(tf.math.abs(data))
     data *= a
     return data, a
 
