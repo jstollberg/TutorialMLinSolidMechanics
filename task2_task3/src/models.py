@@ -351,12 +351,9 @@ class ModelWF(tf.keras.Model):
             tape.watch(F)
             
             # compute cofactor and determinant
-            F = voigt_to_tensor(F)
-            cofF = cofactor(F)
-            detF = tf.reshape(det(F), (-1,1))
-            F = tensor_to_voigt(F)
-            cofF = tensor_to_voigt(cofF)
-            
+            cofF = tensor_to_voigt(cofactor(voigt_to_tensor(F)))
+            detF = tf.reshape(det(voigt_to_tensor(F)), (-1,1))
+
             # evaluate energy
             inp = tf.concat([F, cofF, detF], axis=1)
             W = self._strain_energy(inp)

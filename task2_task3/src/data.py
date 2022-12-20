@@ -19,7 +19,7 @@ from models import InvariantsTransIso, StrainEnergyTransIso
 from models import PiolaKirchhoff
 
 # depending on the system one of these two base paths should work
-# loc_base = os.path.join(".", "task2", "data")
+# loc_base = os.path.join(".", "task2_task3", "data")
 loc_base = os.path.join(".", "..", "data")
 
 loc_biaxial = (os.path.join(loc_base, "calibration", "biaxial.txt"),

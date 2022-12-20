@@ -47,6 +47,7 @@ kwargs = {"nlayers": 3, "units": 16}
 epochs = 10000
 
 #%% training
+sample_weight = weight_L2(*training_out[0])
 training_in = tf.concat(training_in, axis=0)
 training_out = [tf.concat(training_out[0], axis=0),
                 tf.concat(training_out[1], axis=0)]
@@ -60,7 +61,7 @@ tf.keras.backend.set_value(model_WI.optimizer.learning_rate, 0.002)
 h_WI = model_WI.fit(training_in, 
                     training_out, 
                     epochs=epochs, 
-                    sample_weight=weight_L2(training_out[0]),
+                    sample_weight=sample_weight,
                     verbose=2)
 
 # %% testing

@@ -232,8 +232,8 @@ def rotate(tensor, angle, axis, from_left=True, transpose=False):
     
     # define rotation matrix Q
     Q = [[cos(phi) + (x**2)*(1 - cos(phi)), x*y*(1 - cos(phi)) - z*sin(phi), x*z*(1 - cos(phi)) + y*sin(phi)],
-         [y*x*(1 - cos(phi)) + z*sin(phi), cos(phi) + (y**2)*(1 - cos(phi)), y*z*(1 - cos(phi)) - x*sin(phi)],
-         [z*x*(1 - cos(phi)) - y*sin(phi), z*y*(1 - cos(phi)) + x*sin(phi), cos(phi) + (z**2)*(1 - cos(phi))]]
+          [y*x*(1 - cos(phi)) + z*sin(phi), cos(phi) + (y**2)*(1 - cos(phi)), y*z*(1 - cos(phi)) - x*sin(phi)],
+          [z*x*(1 - cos(phi)) - y*sin(phi), z*y*(1 - cos(phi)) + x*sin(phi), cos(phi) + (z**2)*(1 - cos(phi))]]
     Q = tf.convert_to_tensor(Q, dtype=tensor.dtype)
     Q = tf.tile(Q, [len(tensor),1])
     Q = tf.reshape(Q, (len(tensor),3,3))
@@ -256,7 +256,7 @@ def rotate(tensor, angle, axis, from_left=True, transpose=False):
         res = tensor_to_voigt(res)
     return res
 
-def cubic_symmetries(tensor, from_left=True):
+def cubic_symmetries(tensor, from_left=False, transpose=False):
     """
     Evaluate the rotations for all symmetry planes of cubic materials.
 
@@ -264,43 +264,48 @@ def cubic_symmetries(tensor, from_left=True):
     ----------
     tensor : tensorflow.Tensor
         The tensor to rotate.
+    from_left : bool, optional
+        If true, the rotation matrix is multiplied from the left, i.e. Q*T.
+        Otherwise, T*Q is computed. The default is True.
+    transpose : bool, optional
+        If true, the rotation matrix is transposed.
 
     Returns
     -------
-    sym : tensorflow.tensor
+    sym : list
         The tensor rotated around all symmetry axes.
 
     """
     sym = [tensor, 
            
-           rotate(tensor, np.pi/2, (1,0,0), from_left), 
-           rotate(tensor, np.pi, (1,0,0), from_left),
-           rotate(tensor, 3*np.pi/2, (1,0,0), from_left), 
+           rotate(tensor, np.pi/2, (1,0,0), from_left, transpose), 
+           rotate(tensor, np.pi, (1,0,0), from_left, transpose),
+           rotate(tensor, 3*np.pi/2, (1,0,0), from_left, transpose), 
             
-           rotate(tensor, np.pi/2, (0,1,0), from_left), 
-           rotate(tensor, np.pi, (0,1,0), from_left),
-           rotate(tensor, 3*np.pi/2, (0,1,0), from_left), 
+           rotate(tensor, np.pi/2, (0,1,0), from_left, transpose), 
+           rotate(tensor, np.pi, (0,1,0), from_left, transpose),
+           rotate(tensor, 3*np.pi/2, (0,1,0), from_left, transpose), 
            
-           rotate(tensor, np.pi/2, (0,0,1), from_left), 
-           rotate(tensor, np.pi, (0,0,1), from_left),
-           rotate(tensor, 3*np.pi/2, (0,0,1), from_left),
+           rotate(tensor, np.pi/2, (0,0,1), from_left, transpose), 
+           rotate(tensor, np.pi, (0,0,1), from_left, transpose),
+           rotate(tensor, 3*np.pi/2, (0,0,1), from_left, transpose),
            
-           rotate(tensor, np.pi, (1,1,0), from_left),
-           rotate(tensor, np.pi, (-1,1,0), from_left),
-           rotate(tensor, np.pi, (1,0,1), from_left),
-           rotate(tensor, np.pi, (-1,0,1), from_left),
-           rotate(tensor, np.pi, (0,1,1), from_left),
-           rotate(tensor, np.pi, (0,-1,1), from_left),
+           rotate(tensor, np.pi, (1,1,0), from_left, transpose),
+           rotate(tensor, np.pi, (-1,1,0), from_left, transpose),
+           rotate(tensor, np.pi, (1,0,1), from_left, transpose),
+           rotate(tensor, np.pi, (-1,0,1), from_left, transpose),
+           rotate(tensor, np.pi, (0,1,1), from_left, transpose),
+           rotate(tensor, np.pi, (0,-1,1), from_left, transpose),
            
-           rotate(tensor, 2*np.pi/3, (1,1,1), from_left),
-           rotate(tensor, 2*np.pi/3, (-1,1,1), from_left),
-           rotate(tensor, 2*np.pi/3, (1,-1,1), from_left),
-           rotate(tensor, 2*np.pi/3, (-1,-1,1), from_left),
+           rotate(tensor, 2*np.pi/3, (1,1,1), from_left, transpose),
+           rotate(tensor, 2*np.pi/3, (-1,1,1), from_left, transpose),
+           rotate(tensor, 2*np.pi/3, (1,-1,1), from_left, transpose),
+           rotate(tensor, 2*np.pi/3, (-1,-1,1), from_left, transpose),
            
-           rotate(tensor, 4*np.pi/3, (1,1,1), from_left),
-           rotate(tensor, 4*np.pi/3, (-1,1,1), from_left),
-           rotate(tensor, 4*np.pi/3, (1,-1,1), from_left),
-           rotate(tensor, 4*np.pi/3, (-1,-1,1), from_left),
+           rotate(tensor, 4*np.pi/3, (1,1,1), from_left, transpose),
+           rotate(tensor, 4*np.pi/3, (-1,1,1), from_left, transpose),
+           rotate(tensor, 4*np.pi/3, (1,-1,1), from_left, transpose),
+           rotate(tensor, 4*np.pi/3, (-1,-1,1), from_left, transpose),
            ]
     
     return sym

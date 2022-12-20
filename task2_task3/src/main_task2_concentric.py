@@ -30,17 +30,18 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 #%% load concentric data
-sample_size = 90
+sample_size = 30
 F_samples, F_test = load_random_gradient_data(loc_concentric, sample_size)
 
 P_samples, W_samples = PiolaKirchhoff()(F_samples, 
                                         InvariantsTransIso(), 
                                         StrainEnergyTransIso())
+P_load_paths = tf.reshape(P_samples, (sample_size,-1,9))
 
 C_samples = right_cauchy_green(F_samples)
 
 #%% setup
-sample_weights = weight_L2(P_samples)
+sample_weights = weight_L2(*P_load_paths)
 kwargs = {"nlayers": 3, "units": 16}
 epochs = 10000
 
