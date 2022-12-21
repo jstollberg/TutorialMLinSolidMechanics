@@ -45,13 +45,17 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 training_in = [F_bcc_uniaxial, F_bcc_biaxial, F_bcc_shear, F_bcc_volumetric]
 training_out = [[P_bcc_uniaxial, P_bcc_biaxial, P_bcc_shear, P_bcc_volumetric],
                 [W_bcc_uniaxial, W_bcc_biaxial, W_bcc_shear, W_bcc_volumetric]]
+# training_in = [F_bcc_shear]
+# training_out = [[P_bcc_shear], [W_bcc_shear]]
 kwargs = {"nlayers": 3, "units": 16}
-epochs = 2000
-observers = 8  # 1 means only the initial data
+epochs = 2
+observers = 64  # 1 means only the initial data
 
-pre_train = True
+pre_train = False
 checkpoint_path = os.path.join(".", f"checkpoints_{observers}", "cp.ckpt")
 checkpoint_path_pre = os.path.join(".", "checkpoints_pre", "cp.ckpt")
+# checkpoint_path = os.path.join(".", f"checkpoints_{observers}_shear", "cp.ckpt")
+# checkpoint_path_pre = os.path.join(".", "checkpoints_pre_shear", "cp.ckpt")
 
 #%% augment data
 n_initial = sum(len(f) for f in training_in)*24
@@ -107,7 +111,7 @@ if pre_train:
     h_pre = model_WF.fit(training_in[0:n_initial], 
                          [training_out[0][0:n_initial], 
                           training_out[1][0:n_initial]], 
-                         epochs=3600, 
+                         epochs=15000, 
                          sample_weight=sample_weight[0:n_initial],
                          verbose=2,
                          callbacks=[cp_callback_pre])
@@ -115,8 +119,10 @@ if pre_train:
 else:
     try:
         model_WF.load_weights(checkpoint_path)
+        print("Load weights from last checkpoint...")
     except:
         model_WF.load_weights(checkpoint_path_pre)
+        print("Load weights from pre-training...")
             
 #%% training
 cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
@@ -199,7 +205,7 @@ for i in components:
                      alpha=0.2, color=color_map[i])
 plt.legend(ncol=3, handles=handles, handlelength=1, columnspacing=0.7)
 # plt.grid()
-plt.xlabel("$F_{11}$")
+plt.xlabel("$F_{12}$")
 plt.ylabel("$P_{ij}$")
 fig1.tight_layout(pad=0.2)
 # plt.savefig(f"./WF_cubic_PvsF_{observers}.pdf")
@@ -211,7 +217,7 @@ plot_energy(ax2, test_data[0], min_W, 1, test_data[2])
 ax2.fill_between(test_data[0][:,1], max_W.flatten(), min_W.flatten(), 
                  alpha=0.2, color="black")
 # plt.grid()
-plt.xlabel("$F_{11}$")
+plt.xlabel("$F_{12}$")
 plt.ylabel("$W$")
 fig2.tight_layout(pad=0.2)
 # plt.savefig(f"./WF_cubic_WvsF_{observers}.pdf")
