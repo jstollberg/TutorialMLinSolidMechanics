@@ -2,26 +2,16 @@
 Tutorial Machine Learning in Solid Mechanics (WiSe 22/23)
 Task 4: Viscoelasticity
 ==================
-Authors: Dominik K. Klein
+Authors: Henrik Hembrock, Jonathan Stollberg, Dominik K. Klein
          
 01/2023
 """
-
-
-# %%   
-"""
-Import modules
-
-"""
-
 import numpy as np
 import tensorflow as tf
 
 tf_dt = 'float32'
 
-
 def harmonic_data(E_infty, E, eta, n, omega, A):
-    
     """
     Solution of the generalized Maxwell model, using the explicit Euler scheme.
     
@@ -35,8 +25,6 @@ def harmonic_data(E_infty, E, eta, n, omega, A):
     eta: viscosity of damper
 
     """
-    
-    
     t = np.linspace(0, 2*np.pi,n)
 
     eps = A * np.sin(omega * t)
@@ -45,22 +33,15 @@ def harmonic_data(E_infty, E, eta, n, omega, A):
     gamma = np.zeros_like(eps)
     dts = np.zeros_like(eps)
 
-    
     for i in range(len(t)-1):
-        
         dts[i+1] = t[i+1] - t[i]
-        
         gamma[i+1] = gamma[i] + dts[i+1] * E / eta * ( eps[i] - gamma[i] )
-        
         sig[i+1] = E_infty * eps[i+1] + E * ( eps[i+1] - gamma[i+1] )
         
-    
-       
     eps = tf.constant(eps, dtype=tf_dt)
     eps = tf.expand_dims(eps, axis = 0)
     eps = tf.expand_dims(eps, axis = 2)
     
-        
     eps_dot = tf.constant(eps_dot, dtype=tf_dt)
     eps_dot = tf.expand_dims(eps_dot, axis = 0)
     eps_dot = tf.expand_dims(eps_dot, axis = 2)
@@ -75,11 +56,8 @@ def harmonic_data(E_infty, E, eta, n, omega, A):
         
     return eps, eps_dot, sig, dts
 
-
 def relaxation_data(E_infty, E, eta, n, omega, A):
-    
     t = np.linspace(0, 2*np.pi,n)
-    
     n1 = int(np.round(n / 4.0 / omega))
 
     eps = A * np.sin(omega * t[0:n1])
@@ -92,22 +70,15 @@ def relaxation_data(E_infty, E, eta, n, omega, A):
     gamma = np.zeros_like(eps)
     dts = np.zeros_like(eps)
     
-    
     for i in range(len(t)-1):
-        
         dts[i+1] = t[i+1] - t[i]
-        
         gamma[i+1] = gamma[i] + dts[i+1] * E / eta * ( eps[i] - gamma[i] )
-        
         sig[i+1] = E_infty * eps[i+1] + E * ( eps[i+1] - gamma[i+1] )
-        
-    
        
     eps = tf.constant(eps, dtype=tf_dt)
     eps = tf.expand_dims(eps, axis = 0)
     eps = tf.expand_dims(eps, axis = 2)
-    
-        
+       
     eps_dot = tf.constant(eps_dot, dtype=tf_dt)
     eps_dot = tf.expand_dims(eps_dot, axis = 0)
     eps_dot = tf.expand_dims(eps_dot, axis = 2)
@@ -122,17 +93,13 @@ def relaxation_data(E_infty, E, eta, n, omega, A):
         
     return eps, eps_dot, sig, dts
 
-
 def generate_data_harmonic(E_infty, E, eta, n, omegas, As):
-    
     eps = []
     eps_dot = []
     sig = []
     dts = []
     
-    
     for i in range(len(omegas)):
-        
         eps2, eps_dot2, sig2, dts2 = harmonic_data(E_infty, E, eta, \
                                                 n, omegas[i], As[i])
             
@@ -148,17 +115,13 @@ def generate_data_harmonic(E_infty, E, eta, n, omegas, As):
     
     return eps, eps_dot, sig, dts
 
-
 def generate_data_relaxation(E_infty, E, eta, n, omegas, As):
-    
     eps = []
     eps_dot = []
     sig = []
     dts = []
     
-    
     for i in range(len(omegas)):
-        
         eps2, eps_dot2, sig2, dts2 = relaxation_data(E_infty, E, eta, \
                                                 n, omegas[i], As[i])
             
@@ -173,14 +136,3 @@ def generate_data_relaxation(E_infty, E, eta, n, omegas, As):
     dts = tf.concat(dts, 0)
     
     return eps, eps_dot, sig, dts
-            
-
-
-
-        
-
-
-
-
-
-

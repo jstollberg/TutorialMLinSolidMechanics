@@ -9,7 +9,7 @@ Authors: Henrik Hembrock, Jonathan Stollberg, Dominik K. Klein
 import tensorflow as tf
 from tensorflow.keras import layers
 
-class MaxwellModel(layers.Layer):
+class MaxwellModel(tf.keras.Model):
     def __init__(self, E_infty, E, eta, **kwargs):
         super(MaxwellModel, self).__init__(**kwargs)
         self.E_infty = E_infty
@@ -40,15 +40,99 @@ class MaxwellModel(layers.Layer):
         gammas = tf.stack(gammas, axis=1)
         
         return stresses
-            
-# class MaxwellModelFFNN(tf.keras.Models):
-#     def __init__(self, E_infty, E, eta, nlayers=3, units=8):
-#         super(MaxwellModelFFNN, self).__init__()
-#         self.ls = [layers.Dense(units, activation="softplus", 
-#                                 input_shape=(1,1))]
-#         for l in range(nlayers - 1):
-#             self.ls += [layers.Dense(units, activation="softplus")]
-#         self.ls += [layers.Dense(1)]
     
-#     def call(self, inp):
-#         pass
+class RNNCell(tf.keras.layers.Layer):
+    
+    def __init__(self, **kwargs):
+        super(RNNCell, self).__init__(**kwargs)
+        self.state_size = [[1]]
+        self.output_size = [[1]]
+     
+        self.ls = [layers.Dense(32, 'softplus')]
+        self.ls += [layers.Dense(2)]
+        
+    def call(self, inputs, states):
+        # n: current time step, N: old time step
+        eps_n = inputs[0]
+        hs = inputs[1]
+        gamma_N = states[0]  # internal variable
+        x = tf.concat([eps_n, hs, gamma_N], axis = 1)
+                
+        for l in self.ls:
+            x = l(x)
+        sig_n = x[:,0:1]
+        gamma_n = x[:,1:2]
+            
+        return sig_n , [gamma_n]
+    
+    def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
+        # define initial values of the internal variables as zero
+        return [tf.zeros([batch_size, 1])]
+
+def build_naive_RNN(**kwargs):
+    eps = tf.keras.Input(shape=[None, 1], name='input_eps')
+    hs = tf.keras.Input(shape=[None, 1], name='input_hs')
+        
+    cell = RNNCell(**kwargs)
+    layer1 = layers.RNN(cell, return_sequences=True, return_state=False)
+    sigs = layer1((eps, hs))
+
+    model = tf.keras.Model([eps, hs], [sigs])
+    model.compile('adam', 'mse')
+    
+    return model
+            
+class MaxwellModelCell(layers.AbstractRNNCell):
+    # TODO: is bias_constraint = non_neg() also okay instead of no bias?
+    def __init__(self, nlayers=3, units=8, activation="softplus"):
+        super(MaxwellModelCell, self).__init__()
+        self.ls = [layers.Dense(units, 
+                                activation=activation,
+                                # use_bias=False,
+                                input_shape=(1,1,1))]
+        for l in range(nlayers - 1):
+            self.ls += [layers.Dense(units, 
+                                     activation=activation,
+                                     # use_bias=False
+                                     )]
+        self.ls += [layers.Dense(2, activation=activation, use_bias=False)]
+        
+    @property
+    def state_size(self):
+        return [[1]]
+    
+    @property
+    def output_size(self):
+        return [[1]]
+    
+    def call(self, inputs, states):
+        # n: current time step, N: old time step
+        eps_n = inputs[0]
+        hs = inputs[1]
+        gamma_N = states[0]  # internal variable
+        x = tf.concat([eps_n, hs, gamma_N], axis=1)
+             
+        # evaluate layers
+        for l in self.ls:
+            x = l(x)
+        sig_n = x[:,0:1]
+        gamma_n = x[:,1:2]
+            
+        return sig_n, [gamma_n]
+    
+    def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
+        # define initial values of internal variables as zero
+        return [tf.zeros([batch_size, 1])]
+    
+def build_maxwell_RNN(**kwargs):
+    eps = tf.keras.Input(shape=[None, 1], name='input_eps')
+    hs = tf.keras.Input(shape=[None, 1], name='input_hs')
+        
+    cell = MaxwellModelCell(**kwargs)
+    layer1 = layers.RNN(cell, return_sequences=True, return_state=False)
+    sigs = layer1((eps, hs))
+
+    model = tf.keras.Model([eps, hs], [sigs])
+    model.compile('adam', 'mse')
+    
+    return model
