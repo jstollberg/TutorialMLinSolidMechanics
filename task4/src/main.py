@@ -10,7 +10,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 import data as ld
 import plots as lp
-from models import MaxwellModel, build_naive_RNN, build_maxwell_RNN
+from models import MaxwellModel, build_naive_RNN, build_maxwell_RNN, build_GSM_RNN
 import datetime
 now = datetime.datetime.now
 
@@ -52,8 +52,8 @@ sig_m = maxwell_analytical([eps, dts])
 lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 
 #%% training data
-omegas = [1]
-As = [1]
+omegas = [1,1,2]
+As = [1,2,3]
 
 eps_train, _, sig_train, dts_train = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
 # eps_train, _, sig_train, dts_train = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
@@ -121,3 +121,32 @@ sig_m = maxwell_RNN([eps, dts])
 lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 
 #%% generalized standard model
+omegas = [1,1,2]
+As = [1,2,3]
+
+GSM_RNN = build_GSM_RNN()
+
+t1 = now()
+print(t1)
+tf.keras.backend.set_value(GSM_RNN.optimizer.learning_rate, 0.002)
+h = GSM_RNN.fit([eps_train, dts_train], [sig_train], epochs=2000,  verbose=2)
+t2 = now()
+print(f"took {t2 - t1} sec to calibrate the model")
+
+# plot loss
+plt.figure(1, dpi=600)
+plt.semilogy(h.history["loss"], label="training loss")
+plt.grid(which="both")
+plt.xlabel("calibration epoch")
+plt.ylabel("log$_{10}$ MSE")
+plt.legend()
+
+# check the model prediction for harmonic data (mainly interpolation)
+eps, eps_dot, sig, dts = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
+sig_m = GSM_RNN([eps, dts])
+lp.plot_model_pred(eps, sig, sig_m, omegas, As)
+
+# check the model prediction for relaxation data (extrapolation)
+eps, eps_dot, sig, dts = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
+sig_m = GSM_RNN([eps, dts])
+lp.plot_model_pred(eps, sig, sig_m, omegas, As)

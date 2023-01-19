@@ -41,15 +41,19 @@ class MaxwellModel(tf.keras.Model):
         
         return stresses
     
-class RNNCell(tf.keras.layers.Layer):
-    
+class RNNCell(layers.AbstractRNNCell):
     def __init__(self, **kwargs):
         super(RNNCell, self).__init__(**kwargs)
-        self.state_size = [[1]]
-        self.output_size = [[1]]
-     
         self.ls = [layers.Dense(32, 'softplus')]
         self.ls += [layers.Dense(2)]
+        
+    @property
+    def state_size(self):
+        return [[1]]
+
+    @property
+    def output_size(self):
+        return [[1]]
         
     def call(self, inputs, states):
         # n: current time step, N: old time step
@@ -129,6 +133,64 @@ def build_maxwell_RNN(**kwargs):
     hs = tf.keras.Input(shape=[None, 1], name='input_hs')
         
     cell = MaxwellModelCell(**kwargs)
+    layer1 = layers.RNN(cell, return_sequences=True, return_state=False)
+    sigs = layer1((eps, hs))
+
+    model = tf.keras.Model([eps, hs], [sigs])
+    model.compile('adam', 'mse')
+    
+    return model
+
+class GSMCell(layers.AbstractRNNCell):
+    # TODO: is bias_constraint = non_neg() also okay instead of no bias?
+    def __init__(self, nlayers=3, units=8, activation="softplus"):
+        super(GSMCell, self).__init__()
+        self.ls = [layers.Dense(units, 
+                                activation=activation,
+                                input_shape=(1,1,1))]
+        for l in range(nlayers - 1):
+            self.ls += [layers.Dense(units, 
+                                     activation=activation,
+                                     )]
+        self.ls += [layers.Dense(2, activation=activation)]
+        
+    @property
+    def state_size(self):
+        return [[1]]
+    
+    @property
+    def output_size(self):
+        return [[1]]
+    
+    def call(self, inputs, states):
+        # n: current time step, N: old time step
+        eps_n = inputs[0]
+        hs = inputs[1]
+        gamma_N = states[0]  # internal variable
+             
+        # evaluate layers
+        with tf.GradientTape() as tape1:
+            with tf.GradientTape() as tape2:
+                tape1.watch(gamma_N)
+                tape2.watch(eps_n)
+                x = tf.concat([eps_n, hs, gamma_N], axis=1)
+                for l in self.ls:
+                    x = l(x)
+                
+        sig_n = tape2.gradient(x, eps_n)
+        gamma_n = -1*tape1.gradient(x, gamma_N)
+
+        return sig_n, [gamma_n]
+    
+    def get_initial_state(self, inputs=None, batch_size=None, dtype=None):
+        # define initial values of internal variables as zero
+        return [tf.zeros([batch_size, 1])]
+    
+def build_GSM_RNN(**kwargs):
+    eps = tf.keras.Input(shape=[None, 1], name='input_eps')
+    hs = tf.keras.Input(shape=[None, 1], name='input_hs')
+        
+    cell = GSMCell(**kwargs)
     layer1 = layers.RNN(cell, return_sequences=True, return_state=False)
     sigs = layer1((eps, hs))
 
