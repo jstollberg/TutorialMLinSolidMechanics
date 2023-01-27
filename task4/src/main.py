@@ -52,8 +52,8 @@ sig_m = maxwell_analytical([eps, dts])
 lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 
 #%% training data
-omegas = [1,1,2]
-As = [1,2,3]
+omegas = [1,2]
+As = [1,3]
 
 eps_train, _, sig_train, dts_train = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
 # eps_train, _, sig_train, dts_train = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
@@ -67,7 +67,7 @@ RNN = build_naive_RNN()
 t1 = now()
 print(t1)
 tf.keras.backend.set_value(RNN.optimizer.learning_rate, 0.002)
-h = RNN.fit([eps_train, dts_train], [sig_train], epochs = 2000,  verbose = 2)
+h = RNN.fit([eps_train, dts_train], [sig_train], epochs = 4000,  verbose = 2)
 t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
@@ -93,12 +93,12 @@ lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 omegas = [1,1,2]
 As = [1,2,3]
 
-maxwell_RNN = build_maxwell_RNN()
+maxwell_RNN = build_maxwell_RNN(E_infty, E)
 
 t1 = now()
 print(t1)
 tf.keras.backend.set_value(maxwell_RNN.optimizer.learning_rate, 0.002)
-h = maxwell_RNN.fit([eps_train, dts_train], [sig_train], epochs=2000,  verbose=2)
+h = maxwell_RNN.fit([eps_train, dts_train], [sig_train], epochs=4000,  verbose=2)
 t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
@@ -124,12 +124,12 @@ lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 omegas = [1,1,2]
 As = [1,2,3]
 
-GSM_RNN = build_GSM_RNN()
+GSM_RNN = build_GSM_RNN(eta)
 
 t1 = now()
 print(t1)
 tf.keras.backend.set_value(GSM_RNN.optimizer.learning_rate, 0.002)
-h = GSM_RNN.fit([eps_train, dts_train], [sig_train], epochs=2000,  verbose=2)
+h = GSM_RNN.fit([eps_train, dts_train], [sig_train], epochs=4000,  verbose=2)
 t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
