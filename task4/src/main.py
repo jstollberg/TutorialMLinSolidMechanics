@@ -35,8 +35,8 @@ eps, eps_dot, sig, dts = ld.generate_data_relaxation(E_infty, E, eta, n, omegas,
 lp.plot_data(eps, eps_dot, sig, omegas, As, "data_relaxation.pdf")
 
 #%% analytical Maxwell model
-omegas = [1,1,2]
-As = [1,2,3]
+omegas = [1]
+As = [1]
 
 # build model
 maxwell_analytical = MaxwellModel(E_infty, E, eta)
@@ -52,11 +52,15 @@ sig_m = maxwell_analytical([eps, dts])
 # lp.plot_model_pred(eps, sig, sig_m, omegas, As)
 
 #%% training data
-omegas = [1,1,2]
-As = [1,2,3]
+omegas = [1,2]
+As = [1,3]
 
-# eps_train, _, sig_train, dts_train = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
-eps_train, _, sig_train, dts_train = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
+eps_train1, _, sig_train1, dts_train1 = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
+eps_train2, _, sig_train2, dts_train2 = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
+
+eps_train = tf.concat([eps_train1, eps_train2], 0)
+sig_train = tf.concat([sig_train1, sig_train2], 0)
+dts_train = tf.concat([dts_train1, dts_train2], 0)
 
 #%% naive RNN
 omegas = [1,1,2]
