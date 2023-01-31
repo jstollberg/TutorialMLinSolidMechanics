@@ -58,9 +58,20 @@ As = [1,3]
 eps_train1, _, sig_train1, dts_train1 = ld.generate_data_harmonic(E_infty, E, eta, n, omegas, As)
 eps_train2, _, sig_train2, dts_train2 = ld.generate_data_relaxation(E_infty, E, eta, n, omegas, As)
 
+# train on both data sets
 eps_train = tf.concat([eps_train1, eps_train2], 0)
 sig_train = tf.concat([sig_train1, sig_train2], 0)
 dts_train = tf.concat([dts_train1, dts_train2], 0)
+
+# train only on cyclic data
+# eps_train = eps_train1
+# sig_train = sig_train1
+# dts_train = dts_train1
+
+# train only on relaxation data
+# eps_train = eps_train2
+# sig_train = sig_train2
+# dts_train = dts_train2
 
 #%% naive RNN
 omegas = [1,1,2]
@@ -76,7 +87,9 @@ t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
 # plot loss
-plt.figure(1, dpi=600)
+fig = plt.figure(1, dpi=600)
+fig_size = fig.get_size_inches()
+fig.set_figwidth(fig_size[1]/2)
 plt.semilogy(h.history["loss"], label="training loss")
 plt.grid(which="both")
 plt.xlabel("calibration epoch")
@@ -108,7 +121,9 @@ t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
 # plot loss
-plt.figure(1, dpi=600)
+fig = plt.figure(1, dpi=600)
+fig_size = fig.get_size_inches()
+fig.set_figwidth(fig_size[1]/2)
 plt.semilogy(h.history["loss"], label="training loss")
 plt.grid(which="both")
 plt.xlabel("calibration epoch")
@@ -140,7 +155,9 @@ t2 = now()
 print(f"took {t2 - t1} sec to calibrate the model")
 
 # plot loss
-plt.figure(1, dpi=600)
+fig = plt.figure(1, dpi=600)
+fig_size = fig.get_size_inches()
+fig.set_figwidth(fig_size[1]/2)
 plt.semilogy(h.history["loss"], label="training loss")
 plt.grid(which="both")
 plt.xlabel("calibration epoch")
