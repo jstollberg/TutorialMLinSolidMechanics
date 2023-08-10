@@ -1,2 +1,0 @@
-WI: 1 hidden layer and 4 nodes still work
-MS: definitely not smaller than 3 layers and 16 nodes
